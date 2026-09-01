@@ -1,4 +1,8 @@
 <script>
+  import Tips from './lib/Tips.svelte';
+  // The unexpected-phase fallback below still renders example.questions, so
+  // this import exists only for that harness; T19 removes the branch and
+  // this import together.
   import example from './lib/example.json';
   import Plan from './lib/Plan.svelte';
   import Practice from './lib/Practice.svelte';
@@ -16,10 +20,12 @@
 {:else if session.phase === 'interviewing'}
   <!-- Practice (9.4). -->
   <Practice />
+{:else if session.phase === 'done'}
+  <!-- Your tips (9.5). -->
+  <Tips />
 {:else}
-  <!-- T18 verification harness: all eight fixture questions on one screen.
-       Temporary — T18 (tips screen) replaces this for 'done'. targetsGap is
-       deliberately ignored here. -->
+  <!-- Safety fallback for an unexpected phase value. T19 removes this
+       entirely — all five phases have real screens by then. -->
   <div class="page">
     <div class="column cards">
       {#each example.questions as q (q.id)}

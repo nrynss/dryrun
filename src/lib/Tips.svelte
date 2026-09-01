@@ -1,0 +1,250 @@
+<script>
+  // Your tips screen — dev-diary/design.md 9.5. Result panel 8.11, one card
+  // per question (missed list 8.9, score disclosure 8.12, source quote 3.5),
+  // then the action bar (7.3).
+  import Button from './Button.svelte';
+  import Card from './Card.svelte';
+  import ListBlock from './ListBlock.svelte';
+  import MessageStrip from './MessageStrip.svelte';
+  import ResultPanel from './ResultPanel.svelte';
+  import ScoreRow from './ScoreRow.svelte';
+  import { copy } from './copy.js';
+  import { AXES, buildVerdict } from './shapes.js';
+  import { session } from './session.svelte.js';
+
+  // buildVerdict reads AnswerScore-shaped objects ({ scores }); the session
+  // question carries the same scores object, so wrap it.
+  let scored = $derived(
+    session.questions.filter((q) => q.scores).map((q) => ({ scores: q.scores })),
+  );
+  let verdict = $derived(buildVerdict(scored));
+
+  // Per-axis session averages over the scored questions, keyed by AXES value.
+  let axes = $derived(
+    Object.fromEntries(
+      AXES.map((axis) => {
+        const values = scored
+          .map((s) => s.scores[axis])
+          .filter((n) => typeof n === 'number');
+        return [axis, values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0];
+      }),
+    ),
+  );
+
+  function tryAgain() {
+    // Re-answer the same questions. T25-T30 define the real semantics of a
+    // fresh attempt; for now this re-enters the practice screen with the
+    // existing answers and scores in place.
+    session.current = 0;
+    session.phase = 'interviewing';
+  }
+
+  function differentJob() {
+    // Back to a clean Start screen: every field reset, phase idle.
+    session.posting = null;
+    session.resume = null;
+    session.brief = null;
+    session.fitMatch = null;
+    session.questions = [];
+    session.current = 0;
+    session.error = null;
+    session.agentSeen = false;
+    session.lastCallAt = null;
+    session.phase = 'idle';
+  }
+
+  function printTips() {
+    // CSS cannot open <details>; the standard approach is to open them from
+    // JS before printing — the print stylesheet then keeps the paper clean.
+    document.querySelectorAll('details').forEach((d) => (d.open = true));
+    window.print();
+  }
+</script>
+
+<div class="page">
+  <div class="column tips">
+    <p class="t-h2 wordmark">{copy.app.name}</p>
+    <h1 class="t-h1 title">{copy.tips.title}</h1>
+
+    <!-- 9.5 item 3: the result panel, 16px below the title. -->
+    <div class="result">
+      <ResultPanel {verdict} {axes} />
+    </div>
+
+    <!-- 9.5 item 4: one card per question, 16px between cards. -->
+    <div class="blocks">
+      {#each session.questions as q, i (q.id ?? i)}
+        <Card>
+          <p class="t-micro qnum">{copy.tips.question_n.replace('{n}', String(i + 1))}</p>
+          <p class="t-body-b prompt">{q.prompt}</p>
+
+          {#if q.skipped}
+            <!-- 9.5: a skipped question shows the prompt, then the strip and
+                 nothing else. -->
+            <div class="skipped">
+              <MessageStrip kind="note" role="status" message={copy.tips.skipped} />
+            </div>
+          {:else if q.answer}
+            <h2 class="t-h3 section">{copy.tips.what_you_said}</h2>
+            <p class="t-body text">{q.answer}</p>
+            {#if q.scores}
+
+            <div class="section">
+              <ListBlock heading={copy.feedback.what_to_add} items={q.missed ?? []} />
+            </div>
+
+            <h2 class="t-h3 section">{copy.feedback.good_answer}</h2>
+            <p class="t-body text">{q.modelAnswer}</p>
+
+            <!-- 8.12 + 3.5: the disclosure carries the axis rows, then the
+                 quote inside the per-question detail (9.5). -->
+            <details>
+              <summary class="t-micro">{copy.btn.see_scores}</summary>
+              <div class="scores">
+                <ScoreRow scores={q.scores} />
+                {#if q.sourceQuote}
+                  <div class="quote">
+                    <p class="t-micro quote-label">{copy.plan.quote_label}</p>
+                    <p class="t-small quote-text">"{q.sourceQuote}"</p>
+                  </div>
+                {/if}
+              </div>
+            </details>
+            {/if}
+          {:else}
+            <!-- Unanswered (no answer, not skipped — Q4-Q8 in
+                 the fixture): the prompt alone. Design 9.5 specifies a strip
+                 only for skipped; there is no deck string for "you did not
+                 answer this". Design-doc gap flagged for T19, which owns the
+                 Section 10 state table — a judge can reach this state by
+                 finishing with questions untouched, and it needs honest copy.
+                 No invented string here. -->
+          {/if}
+        </Card>
+      {/each}
+    </div>
+  </div>
+
+  <!-- 9.5 item 5: the action bar (7.3). The quiets sit above the primary:
+       Practise a different job and Print or save these tips, stacked with an
+       8px gap (the two-full-width-quiets limit). -->
+  <div class="actionbar">
+    <div class="actionbar-inner">
+      <div class="quiets">
+        <Button variant="quiet" style="width: 100%" onclick={differentJob}>
+          {copy.btn.different_job}
+        </Button>
+        <Button variant="quiet" style="width: 100%" onclick={printTips}>
+          {copy.btn.print}
+        </Button>
+      </div>
+      <Button onclick={tryAgain}>{copy.btn.again}</Button>
+    </div>
+  </div>
+</div>
+
+<style>
+  /* 9.5: 24px top padding; 7.2: 32px bottom before the action bar. */
+  .tips {
+    padding-block: 24px 32px;
+  }
+
+  /* Wordmark, matching the other screens (9.1/9.3). */
+  .wordmark {
+    color: var(--strong);
+    margin: 0;
+  }
+
+  /* One h1 per screen (13). 12px to the first child. */
+  .title {
+    color: var(--ink);
+    margin: 12px 0 0 0;
+  }
+
+  /* 9.5 item 3: the result panel sits 16px below the title. */
+  .result {
+    margin-top: 16px;
+  }
+
+  /* 9.5 item 4: 32px to the blocks, 16px between them. */
+  .blocks {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-top: 32px;
+  }
+
+  /* Question {n}: t-micro, --ink-quiet. */
+  .qnum {
+    color: var(--ink-quiet);
+    margin: 0;
+  }
+
+  /* prompt t-body-b --ink, 4px under the label. */
+  .prompt {
+    color: var(--ink);
+    margin: 4px 0 0 0;
+  }
+
+  /* The skipped strip sits 16px below the prompt. */
+  .skipped {
+    margin-top: 16px;
+  }
+
+  /* 9.5: sections at 16px, text 8px under its heading. */
+  .section {
+    margin: 16px 0 0 0;
+  }
+  .text {
+    color: var(--ink);
+    margin: 8px 0 0 0;
+  }
+
+  /* 13: every details summary is at least 44px high. */
+  details {
+    margin-top: 16px;
+  }
+  summary {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    color: var(--strong);
+    cursor: pointer;
+  }
+  .scores {
+    margin-top: 8px;
+  }
+
+  /* 3.5: label t-micro --ink-quiet; quote t-small --ink-quiet, straight
+     quotation marks, 3px --edge-firm left rule, 12px padding, below the
+     score row. */
+  .quote {
+    border-left: 3px solid var(--edge-firm);
+    padding-left: 12px;
+    margin-top: 16px;
+  }
+  .quote-label {
+    color: var(--ink-quiet);
+    margin: 0 0 4px 0;
+  }
+  .quote-text {
+    color: var(--ink-quiet);
+    margin: 0;
+  }
+
+  /* The action bar is full-bleed below 768px (7.3); its contents cap at the
+     640px column and centre, matching the other screens. */
+  .actionbar-inner {
+    max-width: var(--column);
+    margin-inline: auto;
+  }
+
+  /* 7.3: two full-width quiet buttons stacked with an 8px gap; the primary
+     sits below. */
+  .quiets {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+</style>

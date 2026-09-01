@@ -214,3 +214,37 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* ============================================================
+   T18 — print stylesheet (design 9.5). The print button opens every
+   <details> from JS before calling window.print() — CSS cannot open
+   them; the media query keeps the printout paper-clean.
+   ============================================================ */
+@media print {
+  /* 9.5: the ground is white paper, not the warm screen paper. :root is
+     included because index.html sets its background inline (same
+     specificity, later in the cascade wins). */
+  :root, html, body, .page {
+    background: var(--card);
+  }
+
+  /* 9.5: hide the action bar, the ChatGPT line and the progress row.
+     ProgressRow renders a t-micro label over a .segments bar with no
+     wrapper class, so both halves are named here. !important beats the
+     components' own scoped display rules; on the tips screen (the only
+     screen with a print button) none of these exist, so this is purely
+     defensive. */
+  .actionbar,
+  .chatline,
+  .segments,
+  p.t-micro.label {
+    display: none !important;
+  }
+
+  /* No card shadows on paper (5.4: cards carry the only shadow).
+     !important beats the scoped .card/.result-panel rules. */
+  .card,
+  .result-panel {
+    box-shadow: none !important;
+  }
+}
