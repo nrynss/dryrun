@@ -3,6 +3,7 @@
   // order, inside a per-question disclosure on the tips screen. The fill
   // colour is the band for THAT axis value (5.2): good → --strong,
   // mid → --almost, bad → --note.
+  import { onMount, flushSync } from 'svelte';
   import { copy } from './copy.js';
   import { AXES, scoreBand } from './shapes.js';
 
@@ -25,14 +26,70 @@
       };
     }),
   );
+
+  // Section 12: the fill grows 0 → (value/5*100)% over 300ms ease-out. The
+  // rows live inside a closed <details> (Tips 9.5), so mounting happens while
+  // the content is hidden — the grow waits for the parent disclosure's toggle
+  // event instead, so the fill visibly grows when the disclosure opens. Two
+  // animation frames give the browser a committed 0-width state to transition
+  // from (the open and the width change would otherwise land in the same
+  // frame and no transition would play). Reduced motion: the global app.css
+  let filled = $state(false);
+  // Close commits the width to 0 without a transition (the shrink would
+  // otherwise freeze mid-flight when the details hides the content); the
+  // class is dropped on the reopen rAF so every open grows from a clean 0.
+  let noAnim = $state(false);
+  let root;
+
+  onMount(() => {
+    // printTips opens every <details> and dispatches this synchronously
+    // before window.print(): commit the fills at their final width (no
+    // transition) so the print render sees full bars, not 0-width starts.
+    // flushSync forces the width change into the DOM now — Svelte batches
+    // state flushes to the microtask, which would land after window.print().
+    const onPreparePrint = () => {
+      flushSync(() => {
+        noAnim = true;
+        filled = true;
+      });
+    };
+    document.addEventListener('dryrun:prepare-print', onPreparePrint);
+
+    const details = root?.closest('details');
+    if (!details) {
+      // No disclosure ancestor: grow after mount (double rAF, same reason).
+      requestAnimationFrame(() => requestAnimationFrame(() => (filled = true)));
+      return () => document.removeEventListener('dryrun:prepare-print', onPreparePrint);
+    }
+    // A details already open at mount (print prepared it): fill is final.
+    if (details.open) filled = true;
+    const onToggle = () => {
+      if (details.open) {
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() => {
+            noAnim = false;
+            filled = true;
+          }),
+        );
+      } else {
+        filled = false;
+        noAnim = true;
+      }
+    };
+    details.addEventListener('toggle', onToggle);
+    return () => {
+      details.removeEventListener('toggle', onToggle);
+      document.removeEventListener('dryrun:prepare-print', onPreparePrint);
+    };
+  });
 </script>
 
-<div class="rows">
+<div class="rows" class:no-anim={noAnim} bind:this={root}>
   {#each rows as row (row.axis)}
     <div class="row">
       <span class="t-body name">{row.name}</span>
       <span class="bar" aria-hidden="true">
-        <span class="fill {row.fill}" style="width: {row.pct}%"></span>
+        <span class="fill {row.fill}" style="width: {filled ? row.pct : 0}%"></span>
       </span>
       <span class="t-number value">{row.value}</span>
     </div>
@@ -82,14 +139,21 @@
   }
 
   /* fill height 100%, width (value/5*100)% set inline, background the band
-     colour for that axis value (5.2). */
+     colour for that axis value (5.2). Section 12: the width transition makes
+     the fill grow over 300ms ease-out when the disclosure opens. */
   .fill {
     display: block;
     height: 100%;
+    transition: width 300ms ease-out;
   }
   .fill-good { background: var(--strong); }
   .fill-mid { background: var(--almost); }
   .fill-bad { background: var(--note); }
+  /* Close (and print-prepare) commit the width instantly: no frozen
+     mid-shrink timeline, so every open grows from a clean 0. */
+  .no-anim .fill {
+    transition: none;
+  }
 
   /* value t-number --ink, width 28px, text-align right. */
   .value {

@@ -8,7 +8,9 @@
   import { session } from './session.svelte.js';
 
   let flashing = $state(false);
+  let fading = $state(false);
   let flashTimer;
+  let fadeTimer;
 
   $effect(() => {
     // Flash when a call arrives, revert after 4s. Keyed on session.lastCallAt
@@ -17,12 +19,23 @@
     // unmount through the effect teardown.
     if (session.lastCallAt == null) {
       flashing = false;
+      fading = false;
       return;
     }
     flashing = true;
+    fading = false;
     clearTimeout(flashTimer);
+    clearTimeout(fadeTimer);
+    // Section 12 timeline: the flash background appears instantly, the text
+    // reverts at 4s (flashing → false), and the background then fades from
+    // --strong-wash to transparent over 1200ms linear (fading → true, fully
+    // gone at 5.2s). A later call re-flashes: both timers reset.
     flashTimer = setTimeout(() => (flashing = false), 4000);
-    return () => clearTimeout(flashTimer);
+    fadeTimer = setTimeout(() => (fading = true), 4000);
+    return () => {
+      clearTimeout(flashTimer);
+      clearTimeout(fadeTimer);
+    };
   });
 
   let connected = $derived(hasModelContext());
@@ -41,7 +54,7 @@
   );
 </script>
 
-<div class="chatline" class:flash={flashing}>
+<div class="chatline" class:flash={flashing} class:fading={fading}>
   <span class="dot" class:strong={called} aria-hidden="true"></span>
   <p class="t-small" role="status" aria-live="polite">{text}</p>
 </div>
@@ -59,11 +72,17 @@
   }
 
   /* Flash: --strong-wash background with 8px radius, text becomes the flash
-     string, both revert after 4 seconds (instant revert here).
-     T20 TODO: the 1200ms fade-out of the background is motion's job
-     (design doc Section 12). */
+     string, both revert after 4 seconds. The text swap is instant; the
+     background fades out over 1200ms linear via .fading (Section 12: the
+     4s/1200ms timeline — the bg is fully gone at 5.2s). Reduced motion: the
+     global app.css block makes the fade instant while the text still swaps
+     at 4s. */
   .chatline.flash {
     background: var(--strong-wash);
+  }
+  .chatline.fading {
+    background: transparent;
+    transition: background-color 1200ms linear;
   }
 
   .dot {

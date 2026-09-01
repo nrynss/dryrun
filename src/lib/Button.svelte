@@ -44,6 +44,11 @@
     padding-inline: 20px;
     cursor: pointer;
     text-align: center;
+    /* Section 12: the press moves the button down 1px; 80ms so it reads as a
+       press, not a nudge. The transform lives on .btn-primary:active; one
+       transition on .btn covers every variant. Reduced motion: 'None' — the
+       global app.css block makes it instant anyway. */
+    transition: transform 80ms;
   }
 
   .btn-primary {

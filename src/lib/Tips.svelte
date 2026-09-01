@@ -65,7 +65,12 @@
   function printTips() {
     // CSS cannot open <details>; the standard approach is to open them from
     // JS before printing — the print stylesheet then keeps the paper clean.
+    // Opening alone is not enough: the fills grow over 300ms, so ScoreRow
+    // commits them at their final width synchronously on dryrun:prepare-print,
+    // dispatched here before window.print() — the print render then sees
+    // full bars, not 0-width starts.
     document.querySelectorAll('details').forEach((d) => (d.open = true));
+    document.dispatchEvent(new CustomEvent('dryrun:prepare-print'));
     window.print();
   }
 </script>

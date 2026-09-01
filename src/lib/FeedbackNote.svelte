@@ -4,6 +4,7 @@
   // → good / mid / bad, mapped to --strong / --almost / --note with the
   // matching wash and title. The weakest band is blue, never red (5.2).
   import ListBlock from './ListBlock.svelte';
+  import { cubicOut } from 'svelte/easing';
   import { copy } from './copy.js';
   import { answerAverage, scoreBand } from './shapes.js';
 
@@ -28,9 +29,29 @@
       ? copy.feedback.one_thing.replace('{missed}', score.missed[0])
       : copy.feedback.nothing_missing,
   );
+
+  // Section 12: the note fades in and rises 4px over 200ms ease-out when it
+  // appears under the answer box. Svelte transitions are JS-driven (Web
+  // Animations API) and ignore the global reduced-motion CSS block in
+  // app.css, so the media query is checked here and the appear is instant
+  // under reduced motion. `in:` only — the note leaves instantly when the
+  // question advances (the design specifies the appear, nothing else).
+  function fadeRise(node, { duration = 200 } = {}) {
+    if (
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    ) {
+      return { duration: 0 };
+    }
+    return {
+      duration,
+      easing: cubicOut,
+      css: (t) => `opacity: ${t}; transform: translateY(${(1 - t) * 4}px);`,
+    };
+  }
 </script>
 
-<div class="note note-{band}">
+<div class="note note-{band}" in:fadeRise>
   <h2 class="t-h2 title">{title}</h2>
   <p class="t-body line">{oneThing}</p>
 
