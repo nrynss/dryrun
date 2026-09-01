@@ -1,0 +1,15 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[functions]
+  directory = "netlify/functions"
+
+# WebMCP is only exposed in origin-isolated documents, so the HTML document
+# MUST carry Origin-Agent-Cluster. Permissions-Policy is already the default;
+# set explicitly so the requirement is visible in the repo.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Origin-Agent-Cluster = "?1"
+    Permissions-Policy = "tools=(self)"

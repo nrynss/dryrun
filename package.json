@@ -1,0 +1,21 @@
+{
+  "name": "dryrun",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "@netlify/vite-plugin": "^3.0.1",
+    "@sveltejs/vite-plugin-svelte": "^7.3.0",
+    "svelte": "^5.57.0",
+    "vite": "^8.2.2"
+  },
+  "dependencies": {
+    "openai": "^7.8.0",
+    "pdfjs-dist": "^6.3.289"
+  }
+}
