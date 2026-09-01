@@ -12,6 +12,9 @@
 export const TOTAL_QUESTIONS = 8;
 export const MAX_POSTING_CHARS = 20_000;
 export const MAX_RESUME_CHARS = 20_000;
+// Score requests carry a short answer plus the saved question/brief context;
+// this is a separate, documented aggregate rather than a hidden brief cap.
+export const MAX_SCORE_INPUT_CHARS = 12_000;
 
 /** The four scoring axes, in the order the interface renders them. */
 export const AXES = ['specificity', 'evidence', 'structure', 'relevance'];
@@ -106,26 +109,97 @@ export function buildVerdict(scores) {
  * mid-interview breaks the demo in front of a judge, so the function rejects
  * and retries rather than storing a half-object.
  *
+ * `posting` is optional so the hand-written fixture can be checked without
+ * carrying its entire source document. The server supplies it: sourceQuote is
+ * a trust boundary there, because the model must not invent a job requirement.
+ * `requireFitMatch` is true exactly when the request included a resume.
+ *
+ * @param {{posting?: string, requireFitMatch?: boolean}} [context]
  * @returns {string[]} Human-readable problems. Empty means the object is usable.
  */
-export function validateBriefResponse(data) {
+export function validateBriefResponse(data, context = {}) {
   const problems = [];
-  if (!data || typeof data !== 'object') return ['Response was not an object.'];
+  const isRecord = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
+  const hasExactKeys = (value, keys) => isRecord(value)
+    && Object.keys(value).length === keys.length
+    && keys.every((key) => Object.hasOwn(value, key));
+  const isBoundedString = (value, maxLength) => typeof value === 'string'
+    && value.length >= 1
+    && value.length <= maxLength
+    && value.trim().length > 0;
+  const isBoundedArray = (value, maxItems, minItems = 0) => Array.isArray(value)
+    && value.length >= minItems
+    && value.length <= maxItems;
+  const isBoundedList = (value, maxItems, maxLength, minItems = 0) => Array.isArray(value)
+    && value.length >= minItems
+    && value.length <= maxItems
+    && value.every((item) => isBoundedString(item, maxLength));
+
+  if (!isRecord(data)) return ['Response was not an object.'];
+  if (!hasExactKeys(data, ['brief', 'questions', 'fitMatch'])) problems.push('Response has an invalid object shape.');
 
   const b = data.brief;
-  if (!b) problems.push('Missing brief.');
-  else for (const key of ['owns', 'study', 'angles']) {
-    if (!Array.isArray(b[key]) || !b[key].length) problems.push(`Brief is missing ${key}.`);
+  if (!hasExactKeys(b, ['owns', 'study', 'angles', 'confidence'])) problems.push('Brief has an invalid object shape.');
+  else {
+    for (const key of ['owns', 'study', 'angles']) {
+      if (!isBoundedList(b[key], 6, 240, 1)) {
+        problems.push(`Brief is missing ${key}.`);
+      }
+    }
+    if (!['high', 'low'].includes(b.confidence)) problems.push('Brief has invalid confidence.');
   }
 
   const qs = data.questions;
   if (!Array.isArray(qs)) problems.push('Missing questions array.');
   else {
     if (qs.length !== TOTAL_QUESTIONS) problems.push(`Expected ${TOTAL_QUESTIONS} questions, got ${qs.length}.`);
+    const ids = new Set();
     qs.forEach((q, i) => {
-      if (!q?.prompt) problems.push(`Question ${i + 1} has no prompt.`);
-      if (!q?.sourceQuote) problems.push(`Question ${i + 1} has no sourceQuote.`);
+      if (!hasExactKeys(q, ['id', 'prompt', 'sourceQuote', 'targetsGap'])) {
+        problems.push(`Question ${i + 1} has an invalid object shape.`);
+        return;
+      }
+      if (q?.id !== `q${i + 1}` || ids.has(q?.id)) problems.push(`Question ${i + 1} has an invalid id.`);
+      ids.add(q?.id);
+      if (!isBoundedString(q.prompt, 360)) problems.push(`Question ${i + 1} has an invalid prompt.`);
+      if (!isBoundedString(q.sourceQuote, 600)) problems.push(`Question ${i + 1} has an invalid sourceQuote.`);
+      else if (context.posting && !context.posting.includes(q.sourceQuote)) {
+        problems.push(`Question ${i + 1} sourceQuote is not verbatim in the posting.`);
+      }
+      if (typeof q?.targetsGap !== 'boolean') problems.push(`Question ${i + 1} is missing targetsGap.`);
+      else if (!context.requireFitMatch && q.targetsGap) problems.push(`Question ${i + 1} cannot target a gap without a resume.`);
     });
+  }
+
+  // Fit analysis is meaningful only for an uploaded resume. Keeping it null
+  // otherwise makes the browser contract stable while avoiding fake "gaps".
+  const fit = data.fitMatch;
+  if (context.requireFitMatch && !fit) problems.push('Missing fit match for the supplied resume.');
+  if (!context.requireFitMatch && fit !== null) problems.push('Fit match must be null when no resume was supplied.');
+  if (fit != null) {
+    if (!hasExactKeys(fit, ['evidenced', 'gaps', 'confidence'])) problems.push('Fit match has an invalid object shape.');
+    else {
+      if (!['high', 'low'].includes(fit.confidence)) problems.push('Fit match has invalid confidence.');
+      if (!isBoundedArray(fit.evidenced, 8) || !isBoundedArray(fit.gaps, 8)) problems.push('Fit match is incomplete.');
+      const evidenced = Array.isArray(fit.evidenced) ? fit.evidenced : [];
+      const gaps = Array.isArray(fit.gaps) ? fit.gaps : [];
+      for (const [i, item] of evidenced.entries()) {
+        if (!hasExactKeys(item, ['requirement', 'evidence']) || !isBoundedString(item.requirement, 240) || !isBoundedString(item.evidence, 300)) {
+          problems.push(`Evidenced fit item ${i + 1} is incomplete.`);
+        }
+      }
+      let lastSize = Infinity;
+      for (const [i, item] of gaps.entries()) {
+        const size = item?.size;
+        if (!hasExactKeys(item, ['requirement', 'why', 'size']) || !isBoundedString(item.requirement, 240) || !isBoundedString(item.why, 300) || !Number.isInteger(size) || size < 1 || size > 5) {
+          problems.push(`Fit gap ${i + 1} is invalid.`);
+        }
+        else {
+          if (size > lastSize) problems.push('Fit gaps are not ordered largest first.');
+          lastSize = size;
+        }
+      }
+    }
   }
   return problems;
 }
@@ -133,13 +207,23 @@ export function validateBriefResponse(data) {
 /** @returns {string[]} Problems with one scoring response. Empty means usable. */
 export function validateScoreResponse(data) {
   const problems = [];
-  if (!data || typeof data !== 'object') return ['Response was not an object.'];
-  if (!data.scores) problems.push('Missing scores.');
+  const isRecord = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
+  const hasExactKeys = (value, keys) => isRecord(value)
+    && Object.keys(value).length === keys.length
+    && keys.every((key) => Object.hasOwn(value, key));
+  const isBoundedString = (value, maxLength) => typeof value === 'string'
+    && value.length >= 1
+    && value.length <= maxLength
+    && value.trim().length > 0;
+
+  if (!isRecord(data)) return ['Response was not an object.'];
+  if (!hasExactKeys(data, ['scores', 'missed', 'modelAnswer'])) problems.push('Response has an invalid object shape.');
+  if (!hasExactKeys(data.scores, AXES)) problems.push('Scores has an invalid object shape.');
   else for (const axis of AXES) {
     const v = data.scores[axis];
-    if (typeof v !== 'number' || v < 1 || v > 5) problems.push(`Axis ${axis} is not a number from 1 to 5.`);
+    if (!Number.isInteger(v) || v < 1 || v > 5) problems.push(`Axis ${axis} is not an integer from 1 to 5.`);
   }
-  if (!Array.isArray(data.missed)) problems.push('Missing missed points array.');
-  if (typeof data.modelAnswer !== 'string' || !data.modelAnswer) problems.push('Missing model answer.');
+  if (!Array.isArray(data.missed) || data.missed.length > 6 || data.missed.some((point) => !isBoundedString(point, 240))) problems.push('Missing missed points array.');
+  if (!isBoundedString(data.modelAnswer, 900)) problems.push('Missing model answer.');
   return problems;
 }

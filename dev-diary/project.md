@@ -171,7 +171,9 @@ Netlify AI Gateway. No API keys anywhere. Netlify injects them into the function
 So the repo has no `.env` to fill in, and a judge can deploy it as-is.
 
 Model: `gpt-5.6-luna` ($0.20 in / $1.20 out per MTok). Structured outputs on every call. A
-malformed response mid-interview breaks the session in front of a judge.
+malformed response mid-interview breaks the session in front of a judge. The
+numbers below are planning estimates, not T12 evidence; the bounded-preview
+record is [t12-measurement-template.md](t12-measurement-template.md).
 
 | | Tokens | Cost |
 |---|---|---|
@@ -179,9 +181,25 @@ malformed response mid-interview breaks the session in front of a judge.
 | 8 × scoring | ~10.8k in / 3.2k out | $0.0060 |
 | **Per session** | | **~$0.008 → ~1.5 credits** |
 
-~2,200 complete sessions in the 3,000 hackathon credits. Judging runs 4–21 September and we
-cannot redeploy. So the guard that matters is the input cap, not rate limiting. A huge
-pasted "posting" is the only way to burn real money per request.
+The input contract is exact: a brief accepts a posting up to 20,000 characters
+and an optional resume up to 20,000 characters independently; a score accepts
+at most 12,000 characters across its answer, question, and brief context. Each
+score request accepts the complete saved `Question` returned by a brief
+(`id`, `prompt`, `sourceQuote`, and boolean `targetsGap`) and rejects unknown
+question fields. The provider receives only the question prompt and verbatim
+source quote needed to ground scoring; session metadata such as its ID and
+gap-target flag never affects the model prompt. Each
+brief provider attempt is capped at 1,800 output tokens and each score attempt
+at 450, with no more than two explicit attempts and a 10-second attempt timeout.
+After JSON parsing, the function independently enforces the same strict schema:
+exact object keys, required nested structure, string and array bounds, score
+integers, and the source-quote/resume invariants. Invalid provider output is
+retried once and then returns a fixed safe error. The resulting output ceiling
+and the live-cost evidence format are recorded in
+[t12-measurement-template.md](t12-measurement-template.md); its bounded brief
+uses the exact documented worked-example posting. Judging runs
+4–21 September and we cannot redeploy, so these limits—not rate limiting—are
+the request-level spend guard.
 
 If question quality disappoints in testing, upgrading the single brief-and-questions call is
 cheap and does not touch the scoring budget.
