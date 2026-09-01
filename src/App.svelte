@@ -1,6 +1,7 @@
 <script>
   import example from './lib/example.json';
   import Plan from './lib/Plan.svelte';
+  import Practice from './lib/Practice.svelte';
   import QuestionCard from './lib/QuestionCard.svelte';
   import Start from './lib/Start.svelte';
   import { session } from './lib/session.svelte.js';
@@ -12,10 +13,13 @@
 {:else if session.phase === 'ready'}
   <!-- Your practice (9.3). -->
   <Plan />
+{:else if session.phase === 'interviewing'}
+  <!-- Practice (9.4). -->
+  <Practice />
 {:else}
-  <!-- T14 verification harness: all eight fixture questions on one screen.
-       Temporary — T15 (practice screen) replaces this for 'interviewing',
-       T18 (tips) for 'done'. targetsGap is deliberately ignored here. -->
+  <!-- T18 verification harness: all eight fixture questions on one screen.
+       Temporary — T18 (tips screen) replaces this for 'done'. targetsGap is
+       deliberately ignored here. -->
   <div class="page">
     <div class="column cards">
       {#each example.questions as q (q.id)}
