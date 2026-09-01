@@ -2,6 +2,11 @@
    dev-diary/design.md Revision 2, sections 5, 6, 7 and 12.
    One theme, light. */
 
+/* The design's pixel-exact component specs (8.1-8.13) assume border-box:
+   a 52px button with a 1px border is 52px total. Global, so every future
+   component inherits it instead of re-solving the same overflow. */
+*, *::before, *::after { box-sizing: border-box; }
+
 /* ============================================================
    Section 5 — colour tokens
    ============================================================ */
