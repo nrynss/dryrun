@@ -3,7 +3,7 @@
   // and its source quote (3.5). Nothing else lives on this card.
   import Card from './Card.svelte';
   import Button from './Button.svelte';
-
+  import { copy } from './copy.js';
   let { question, sourceQuote } = $props();
 
   let expanded = $state(false);
@@ -20,15 +20,15 @@
 
   {#if sourceQuote}
     <div class="quote">
-      <p class="t-micro label">From the job advert</p>
+      <p class="t-micro label">{copy.plan.quote_label}</p>
       <p class="t-small text" class:clamped={!expanded}>"{sourceQuote}"</p>
     </div>
 
     <div class="quote-toggle">
       {#if !expanded}
-        <Button variant="quiet" onclick={() => (expanded = true)}>Show all</Button>
+        <Button variant="quiet" onclick={() => (expanded = true)}>{copy.btn.show_all}</Button>
       {:else}
-        <Button variant="quiet" onclick={() => (expanded = false)}>Show less</Button>
+        <Button variant="quiet" onclick={() => (expanded = false)}>{copy.btn.show_less}</Button>
       {/if}
     </div>
   {/if}
@@ -38,6 +38,10 @@
   .question {
     color: var(--ink);
     margin: 0 0 16px 0;
+    /* Section 13: at 200% zoom on a 360px screen a single long word is
+       wider than the card content box; allow a mid-word break so the page
+       never pans horizontally (same treatment as FileChooser's .name). */
+    overflow-wrap: anywhere;
   }
 
   /* 3.5: 3px left rule in --edge-firm, 12px padding to the left of the text. */

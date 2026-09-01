@@ -31,8 +31,22 @@
 
   function startPractice() {
     // Function-down path: render example.json. T25/T32 replace this with the
-    // real analyze call. No fake delay, no loading screen (that is T19).
+    // real analyze call. A fresh start is never the worked example, so the
+    // flag is cleared here as well as in differentJob (state 11).
+    session.isExample = false;
     loadExample();
+  }
+
+  // Section 10 state 10/11: the demo insurance. When the service is down the
+  // example button must be prominent, not hidden — it loads example.json
+  // like a normal start but marks the session as the worked example, so the
+  // plan screen shows notice.example. fixture.js is frozen for T19, so the
+  // loadExample({ asExample }) option of the state audit is honoured here at
+  // the call site instead; T25-T32 may move it into the loader.
+  function seeExample() {
+    loadExample();
+    session.isExample = true;
+    session.serviceDown = false;
   }
 </script>
 
@@ -94,6 +108,14 @@
     {/if}
 
     <p class="t-micro trust">{copy.app.trust}</p>
+    <!-- State 10: the service-down strip sits above the action bar, the
+         last thing in the column. role=alert takes focus when it appears
+         (8.13). -->
+    {#if session.serviceDown}
+      <div class="service-strip">
+        <MessageStrip kind="stop" role="alert" message={copy.err.service_down} />
+      </div>
+    {/if}
   </div>
 
   <!-- 9.1 item 9: the action bar (7.3). Error copy sits above the button:
@@ -106,6 +128,14 @@
       {/if}
       {#if overLimit}
         <MessageStrip kind="stop" role="alert" message={copy.err.over_limit} />
+      {/if}
+      {#if session.serviceDown}
+        <!-- State 10: the example button must be prominent, not hidden
+             (Section 10 note). Primary fill, full width, above Start
+             practice. -->
+        <div class="example-action">
+          <Button onclick={seeExample}>{copy.btn.see_example}</Button>
+        </div>
       {/if}
       <Button disabled={!canStart} onclick={startPractice}>{copy.btn.start}</Button>
     </div>
@@ -228,6 +258,16 @@
     color: var(--ink-quiet);
     text-align: center;
     margin: 32px 0 0 0;
+  }
+  /* State 10: the service-down strip sits 12px below the trust line, above
+     the action bar (7.2). */
+  .service-strip {
+    margin-top: 12px;
+  }
+  /* State 10: the example button is the prominent way out of a downed
+     service; 8px above the primary (7.3). */
+  .actionbar-inner :global(.example-action) {
+    margin-bottom: 8px;
   }
 
   /* The action bar is full-bleed below 768px (7.3 CSS); its contents cap at

@@ -32,6 +32,13 @@
 
 <div class="page">
   <div class="column plan">
+    <!-- Section 10 state 11: the worked-example notice sits at the very top
+         of the screen, above the wordmark. -->
+    {#if session.isExample}
+      <div class="example-notice">
+        <MessageStrip kind="note" role="status" message={copy.notice.example} />
+      </div>
+    {/if}
     <p class="t-h2 wordmark">{copy.app.name}</p>
     <h1 class="t-h1 title">{copy.plan.title}</h1>
     <p class="t-body sub">{copy.plan.sub}</p>
@@ -118,6 +125,9 @@
 
   .thin-strip {
     margin-top: 12px;
+  }
+  .example-notice {
+    margin-bottom: 12px;
   }
 
   /* 9.3: sections are separated by 32px. */

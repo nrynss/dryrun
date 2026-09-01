@@ -5,8 +5,9 @@
   // straight into session.resume — R1 — which the CV text box binds, so the
   // box shows the file without a local copy of the text.
   //
-  // T16 scope handles the scan, locked and too-long cases. The full
-  // four-mode matrix (including err.file_type) is T23's job.
+  // T16 scope handled the scan, locked and too-long cases; T19 adds state 6
+  // (wrong file type — the accept attribute filters the picker, but a user
+  // can still pick any file).
   import Button from './Button.svelte';
   import MessageStrip from './MessageStrip.svelte';
   import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist';
@@ -28,6 +29,17 @@
   async function readFile(file) {
     error = null;
     warning = null;
+
+    // State 6 (wrong file type): extension check against the accepted list.
+    // The accept attribute filters the picker, but users can still pick any
+    // file, so the extension decides. The file is rejected — nothing written
+    // to session.resume — and the --stop strip explains the formats (11.9
+    // names them in capitals because that is how a file picker shows them).
+    if (!/\.(pdf|txt|md)$/i.test(file.name)) {
+      error = copy.err.file_type;
+      return;
+    }
+
     try {
       let text = /\.pdf$/i.test(file.name) ? await extractPdf(file) : await file.text();
       text = text.trim();

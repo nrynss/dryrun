@@ -16,12 +16,14 @@
   import { copy } from './copy.js';
   import { TOTAL_QUESTIONS } from './shapes.js';
   import { hasModelContext } from './webmcp.js';
-  import { session } from './session.svelte.js';
+  import { MAX_ANSWER_CHARS, session } from './session.svelte.js';
 
   let question = $derived(session.questions[session.current]);
   let connected = $derived(hasModelContext());
   let answerEmpty = $derived(!(question?.answer ?? '').trim());
-
+  // Section 10 state 14: the cap from design 15.6. Raw length — the long
+  // check counts every character, matching what a score call would send.
+  let answerTooLong = $derived((question?.answer ?? '').length > MAX_ANSWER_CHARS);
   // 11.5: the placeholder depends on whether ChatGPT is connected.
   let placeholder = $derived(
     connected ? copy.practice.answer_placeholder : copy.practice.answer_placeholder_typing,
@@ -31,19 +33,52 @@
   // the hint says it is waiting for an answer.
   let hint = $derived(connected && answerEmpty ? copy.hint.waiting : copy.practice.hint);
 
-  // Section 10 state 13: Next with an empty box blocks. The strip appears
-  // only after an attempted block and clears once the box has text again.
-  let blocked = $state(false);
+  // Section 10 states 13/14: Next with an empty box, or with an answer over
+  // 6,000 characters, blocks. blocked carries the reason so the right strip
+  // shows; it is null when nothing is blocked, and the two strips can never
+  // show together — next() picks the first cause and returns.
+  let blocked = $state(null); // 'empty' | 'long' | null
   $effect(() => {
-    if (!answerEmpty) blocked = false;
+    // A block clears as soon as its cause is gone, by reason: text in the
+    // box clears the empty block, a shortened answer clears the long block.
+    // Validation itself still happens on the button press (design 4).
+    if (blocked === 'empty' && !answerEmpty) blocked = null;
+    else if (blocked === 'long' && !answerTooLong) blocked = null;
+  });
+
+  // Section 10 state 12: the scoring-failed strip clears when the answer
+  // text changes — the failure described the text as submitted, and any edit
+  // means the person is trying again (the answer stays until then, R1).
+  // failedAnswer latches the text the failure applied to; the flag itself is
+  // set externally (console, then T28), so the effect must not react to the
+  // flag alone or it would clear the strip the moment it appeared.
+  let failedAnswer = $state(null);
+  $effect(() => {
+    if (session.scoreFailed) {
+      if (failedAnswer === null) {
+        failedAnswer = question?.answer ?? '';
+      } else if ((question?.answer ?? '') !== failedAnswer) {
+        session.scoreFailed = false;
+      }
+    } else {
+      failedAnswer = null;
+    }
   });
 
   function next() {
-    if (answerEmpty) {
-      blocked = true; // nothing advances, the answer is not lost
+    // State 20: a score call in flight — the primary is busy and nothing
+    // advances until it settles (the real score call, T28, drives this).
+    if (session.scoring) return;
+    const answer = question?.answer ?? '';
+    if (!answer.trim()) {
+      blocked = 'empty'; // nothing advances, the answer is not lost
       return;
     }
-    blocked = false;
+    if (answer.length > MAX_ANSWER_CHARS) {
+      blocked = 'long';
+      return;
+    }
+    blocked = null;
     advance();
   }
 
@@ -52,7 +87,7 @@
   // it into the session contract. Skipped questions stay skipped (no
   // back-navigation).
   function skip() {
-    blocked = false;
+    blocked = null;
     session.questions[session.current].skipped = true;
     advance();
   }
@@ -63,10 +98,10 @@
   }
 
   function advance() {
+    session.scoreFailed = false; // state 12: never carry the failure forward
     if (session.current < TOTAL_QUESTIONS - 1) {
       session.current += 1;
     } else {
-      // The tips screen is T18; App.svelte renders the harness until then.
       session.phase = 'done';
     }
   }
@@ -76,6 +111,13 @@
   <div class="column practice">
     <!-- 9.4 item 1: the ChatGPT line, 16px top padding. -->
     <ChatGPTLine />
+    <!-- Section 10 state 8: the uploaded file did not read like a CV. The
+         note strip sits at the top of the practice column, under the
+         ChatGPT line; it never blocks — the questions still come from the
+         advert. -->
+    {#if session.fitMatch?.confidence === 'low'}
+      <MessageStrip kind="note" role="status" message={copy.warn.not_cv} />
+    {/if}
 
     <!-- 9.4 item 2: progress row, 16px gap. -->
     <ProgressRow
@@ -99,6 +141,13 @@
       />
       <!-- 9.4 item 5 / Section 10 state 19: the hint under the box. -->
       <p class="t-small hint">{hint}</p>
+      <!-- Section 10 state 12: a score call failed after retries. The strip
+           sits under the answer box, below the hint; it does not block Next
+           and the answer stays (R1). It clears on any edit to the answer or
+           on advance. -->
+      {#if session.scoreFailed}
+        <MessageStrip kind="almost" role="status" message={copy.err.score_failed} />
+      {/if}
     </div>
 
     <!-- 9.4 item 6: feedback note, when the current answer has been scored. -->
@@ -121,13 +170,22 @@
           </Button>
         {/if}
       </div>
-      {#if blocked && answerEmpty}
+      {#if blocked === 'empty'}
         <!-- Section 10 state 13: the block sits directly above the primary.
              role=alert takes focus when it appears (8.13). -->
         <MessageStrip kind="stop" role="alert" message={copy.err.empty_answer} />
+      {:else if blocked === 'long'}
+        <!-- Section 10 state 14: over 6,000 characters, blocked. Same spot,
+             same focus behaviour; the two strips can never show together
+             (next() picks the first cause). -->
+        <MessageStrip kind="stop" role="alert" message={copy.err.answer_long} />
       {/if}
       <!-- On question 8 the primary becomes Show my tips (9.4). -->
-      <Button onclick={next}>
+      <!-- Section 10 state 20: while a score call is in flight the primary
+           shows its busy state — aria-busy, 20px spinner, busy label, width
+           unchanged (8.2). The real score call (T28) drives session.scoring;
+           the flag is console-reachable. -->
+      <Button busy={session.scoring} busyLabel={copy.busy.scoring} onclick={next}>
         {session.current === TOTAL_QUESTIONS - 1 ? copy.btn.tips : copy.btn.next}
       </Button>
     </div>

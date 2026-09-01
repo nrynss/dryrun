@@ -18,6 +18,9 @@
     session.questions.filter((q) => q.scores).map((q) => ({ scores: q.scores })),
   );
   let verdict = $derived(buildVerdict(scored));
+  // Section 10 state 22: zero scored answers — no result panel, the empty
+  // block instead. Reachable by skipping every question.
+  let anyScored = $derived(scored.length > 0);
 
   // Per-axis session averages over the scored questions, keyed by AXES value.
   let axes = $derived(
@@ -40,7 +43,9 @@
   }
 
   function differentJob() {
-    // Back to a clean Start screen: every field reset, phase idle.
+    // Back to a clean Start screen: every field reset, phase idle. The T19
+    // flags reset too — a different job is never the worked example, and a
+    // fresh Start carries no failure or in-flight state.
     session.posting = null;
     session.resume = null;
     session.brief = null;
@@ -50,6 +55,10 @@
     session.error = null;
     session.agentSeen = false;
     session.lastCallAt = null;
+    session.serviceDown = false;
+    session.isExample = false;
+    session.scoreFailed = false;
+    session.scoring = false;
     session.phase = 'idle';
   }
 
@@ -66,10 +75,19 @@
     <p class="t-h2 wordmark">{copy.app.name}</p>
     <h1 class="t-h1 title">{copy.tips.title}</h1>
 
-    <!-- 9.5 item 3: the result panel, 16px below the title. -->
-    <div class="result">
-      <ResultPanel {verdict} {axes} />
-    </div>
+    <!-- 9.5 item 3 / Section 10 state 22: with at least one scored answer
+         the result panel shows; with none, the empty block replaces it — no
+         result panel at all. Reachable by skipping every question. -->
+    {#if anyScored}
+      <div class="result">
+        <ResultPanel {verdict} {axes} />
+      </div>
+    {:else}
+      <div class="empty-block">
+        <p class="t-body empty-text">{copy.empty.no_answers}</p>
+        <Button onclick={tryAgain}>{copy.empty.no_answers_action}</Button>
+      </div>
+    {/if}
 
     <!-- 9.5 item 4: one card per question, 16px between cards. -->
     <div class="blocks">
@@ -166,6 +184,19 @@
     margin-top: 16px;
   }
 
+  /* State 22: the empty block sits where the result panel would, 16px below
+     the title, 12px between the sentence and the restart button (7.2). */
+  .empty-block {
+    margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .empty-text {
+    color: var(--ink);
+    margin: 0;
+  }
+
   /* 9.5 item 4: 32px to the blocks, 16px between them. */
   .blocks {
     display: flex;
@@ -230,6 +261,16 @@
   .quote-text {
     color: var(--ink-quiet);
     margin: 0;
+  }
+
+  /* Section 13: at 200% zoom on a 360px screen the quote's unbreakable run
+     (e.g. "Swagger/OpenAPI,") outgrows the 165px layout width and pans the
+     page; allow a mid-word break below 260px (same treatment as ScoreRow's
+     .name and ResultPanel's .title). */
+  @media (max-width: 260px) {
+    .quote-text {
+      overflow-wrap: anywhere;
+    }
   }
 
   /* The action bar is full-bleed below 768px (7.3); its contents cap at the

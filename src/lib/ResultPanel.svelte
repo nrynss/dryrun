@@ -97,6 +97,14 @@
   .panel-strong .title { color: var(--strong); }
   .panel-almost .title { color: var(--almost); }
   .panel-note .title { color: var(--note); }
+  /* Below 260px the t-display title (text-wrap: balance) cannot wrap and
+     overflows its content box; allow word breaks. */
+  @media (max-width: 260px) {
+    .result-panel .title {
+      text-wrap: wrap;
+      overflow-wrap: anywhere;
+    }
+  }
 
   /* 8.11: line t-body --ink, margin-top 8px. */
   .line {

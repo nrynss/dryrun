@@ -59,6 +59,16 @@
     flex: none;
     margin: 0;
   }
+  /* Below 260px the fixed 120px name cannot fit beside the bar and the
+     28px value; let it shrink and wrap (8.12 holds at normal widths). */
+  @media (max-width: 260px) {
+    .row .name {
+      width: auto;
+      min-width: 0;
+      flex: 0 1 auto;
+      overflow-wrap: anywhere;
+    }
+  }
 
   /* bar flex 1, height 8px, radius 4px, background --edge,
      border 1px solid --edge-firm, overflow hidden. */
