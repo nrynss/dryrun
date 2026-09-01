@@ -41,39 +41,33 @@
 </main>
 
 <style>
-  :global(body) { background: #0A0A0C; color: #E0E0E6; }
   main {
     max-width: 44rem;
     margin: 3rem auto;
     padding: 0 1.5rem;
-    font-family: system-ui, sans-serif;
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
     align-items: flex-start;
   }
-  h1 { margin: 0; text-transform: uppercase; letter-spacing: 0.04em; }
+  h1 { margin: 0; }
   .tagline { margin: 0; opacity: 0.75; }
-  .status, .phase, .count { font-family: ui-monospace, monospace; font-size: 0.8rem; margin: 0; }
+  .status, .phase, .count { font-size: 0.8rem; margin: 0; }
   .phase, .count { opacity: 0.55; }
   .dot {
     display: inline-block; width: 8px; height: 8px;
     background: #6B6D76; margin-right: 0.4rem;
   }
-  .dot.on { background: #00FF41; }
-  .error { color: #FF3366; font-size: 0.9rem; margin: 0; }
-  .ok { color: #00FF41; font-size: 0.9rem; margin: 0; }
-  label { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.7; }
+  .error { font-size: 0.9rem; margin: 0; }
+  .ok { font-size: 0.9rem; margin: 0; }
+  label { font-size: 0.8rem; opacity: 0.7; }
   textarea {
-    width: 100%; background: #121217; color: #E0E0E6;
-    border: 1px solid #2A2A35; border-radius: 0; padding: 0.75rem;
-    font-family: ui-monospace, monospace; font-size: 0.85rem;
+    width: 100%; padding: 0.75rem;
+    font-size: 0.85rem;
   }
-  textarea:focus { outline: none; border-color: #00FF41; }
   button {
-    background: #00FF41; color: #0A0A0C; border: 0; border-radius: 0;
-    padding: 0.6rem 1.4rem; font-weight: 700; text-transform: uppercase;
-    letter-spacing: 0.06em; cursor: pointer;
+    border: 0;
+    padding: 0.6rem 1.4rem; font-weight: 700;
+    cursor: pointer;
   }
-  button:focus-visible { outline: 2px solid #E0E0E6; outline-offset: 2px; }
 </style>
