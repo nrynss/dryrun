@@ -34,14 +34,14 @@ whenever their dependencies allow.
 | T10 | Function | Score task. Fixed prompt plus structured output schema. One answer produces four axis scores, missed points, model answer. | T07 | T11, T12, T28 |
 | T11 | Function | Handle a malformed or refused response without breaking the session. | T09, T10 | T32 |
 | T12 | Function | Measure real token cost against the example posting and check it against the credit budget. | T08, T09, T10 | none |
-| T13 | Interface | `app.css`. Tokens, `color-scheme: dark`, the three faces, hard borders, zero radius. | T07 | T14, T16 |
-| T14 | Interface | Question card, including the source quote treatment. | T13 | T15, T17, T18 |
-| T15 | Interface | Adjudication screen. Answer log, agent status strip, rubric quadrants, running average. | T08, T14 | T19, T20 |
-| T16 | Interface | Console screen. Posting input, character counter, resume input, privacy copy. **Must render `session.posting` itself, not a local draft.** The T02 screen bound the textarea to a local variable, so an agent-set posting left the box looking empty while the page reported 166 chars. A judge reads that as broken. | T13 | T19 |
-| T17 | Interface | Briefing screen. Brief, question list, fit match. | T08, T14 | T19 |
-| T18 | Interface | Report screen. Verdict band, per-question answer, missed points, model answer. | T08, T14 | T19 |
-| T19 | Interface | The nine states from the design reference, with their exact copy. | T15, T16, T17, T18 | T32 |
-| T20 | Interface | Motion. Score count-up, quadrant flash, and `prefers-reduced-motion`. | T15 | none |
+| T13 | Interface | `src/app.css`, plus the critical CSS in `index.html`. Design doc sections 5, 6 and 7. Tokens, `color-scheme: light`, the Lexend and Source Sans 3 links, the type scale as classes, the page frame, the spacing scale, the focus rule, the reduced-motion block. **Replace the existing `color-scheme: dark` and `#0A0A0C` in `index.html`.** Done when a blank page renders paper white with ink text in both faces. | T07 | T14, T16 |
+| T14 | Interface | Question card, design doc 8.7, and the source quote, 3.5. Plus Card 8.1 and Button 8.2. Done when all eight fixture questions render with their quotes at 360px and at 900px. | T13 | T15, T17, T18 |
+| T15 | Interface | Practice screen, design doc 9.4. Progress row 8.6, feedback note 8.8. Done when Q1 through Q8 advance and the three scored fixture answers show their feedback. | T08, T14 | T19, T20 |
+| T16 | Interface | Start screen, design doc 9.1. Text box 8.3, file chooser 8.4, ChatGPT line 8.5, message strip 8.13. The `I have a job advert` route only. Done when typing writes `session.posting` **and** setting `session.posting` from the console fills the box. That second half is the display-parity rule, and it is the bug that made the agent path look broken. | T13 | T19 |
+| T17 | Interface | Your practice screen, design doc 9.3. List block 8.9, fit item 8.10. Done when the whole fixture renders with no placeholder text left anywhere. | T08, T14 | T19 |
+| T18 | Interface | Your tips screen, design doc 9.5. Result panel 8.11, score row 8.12, print stylesheet. Done when all four result cases in design doc 14.1 render correctly. Note the fixture alone only ever produces `not yet` plus `capped`, so use the four literal Verdict objects the design doc supplies. | T08, T14 | T19 |
+| T19 | Interface | Every state in design doc section 10, wired to the copy deck in section 11. Build `src/lib/copy.js` first, then replace every inline string. Done when every row of the section 10 table is reachable and shows its exact string. | T15, T16, T17, T18 | T32 |
+| T20 | Interface | Motion, design doc section 12. Done when every row of the section 12 table behaves and `prefers-reduced-motion` is honoured. | T15 | none |
 | T21 | Resume | Install `pdfjs-dist`, wire the same-origin worker, extract text in the browser. | T07 | T23 |
 | T22 | Resume | Accept pasted text and uploaded `.txt` and `.md`. | T07 | T23, T24 |
 | T23 | Resume | The four failure modes: scanned PDF, locked PDF, over-long resume, not a resume. Each needs its own message. | T21, T22 | T33 |
@@ -86,6 +86,30 @@ interface and the fixture together.
 
 T08 earns its place twice. It ships as the demo that survives the function
 failing, and it lets the whole interface track build with no server at all.
+
+## T13 to T20 is one block
+
+Those eight tasks are a single overnight unit for one agent, not eight separate
+jobs. They share `src/app.css`, `src/App.svelte` and the copy deck, so splitting
+them across agents means merge pain for no gain.
+
+The full specification is `dev-diary/design.md`. Every task above cites the
+section it implements. The agent should not invent a colour, a string, or a
+dimension. If something is missing from the design doc, that is a bug in the
+design doc and worth saying so rather than guessing.
+
+Build order inside the block is T13, T14, T16, T17, T15, T18, T19, T20. That is
+not numeric order. It front-loads the screens that prove the design works and
+leaves states and motion last, so a short night still ends with something whole.
+
+**Nothing in this block touches Netlify.** Every screen renders
+`src/lib/example.json`, which is bundled, so `npm run dev` and `npm run build`
+are enough. There is no function call and no gateway call.
+
+Two traps to avoid. Do not run `netlify deploy --prod`, because production
+deploys cost 15 credits while draft deploys are free. And if you do hit
+`/api/analyze` from the dev server it returns 502 wrapping a free-tier 403, which
+is expected and is not a bug in this block. Do not spend the night fixing it.
 
 ## What cannot run in parallel
 

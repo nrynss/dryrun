@@ -32,10 +32,59 @@ conversation.
 
 | | |
 |---|---|
-| **Who** | Anyone with an interview booked in the next week and a posting in front of them. |
-| **Utility** | Rehearse the questions you will actually face. Find out where you are weak while it still costs nothing. |
-| **Output** | A brief covering what the role owns, what to study and what they will push on. Then a scored session giving your answer, what you missed and a model answer for each question. |
+| **Who** | Anyone preparing for a job interview: a warehouse worker, waitress, driver, carer, shop worker, technician, or office professional. A resume, corporate vocabulary, and familiarity with AI are never prerequisites. |
+| **Utility** | Practise answering the questions that matter for the job, out loud, before the real interview. |
+| **Output** | Clear, kind next-step feedback: what was strong, what to add, and a simple example answer. The detailed role brief and scoring rubric support this outcome, but do not lead the experience. |
 | **What they ship** | A verdict they can act on tonight. |
+
+---
+
+## Product surface: job practice for everyone
+
+**Product decision:** Dry Run is a friendly job-practice tool, not an AI developer demo.
+The technical system is deliberately kept behind the experience. A first-time user should
+understand what to do without knowing what ChatGPT, WebMCP, a job posting, a resume, a
+rubric, or a score is.
+
+The opening promise is:
+
+> **Practise your job interview**
+>
+> Tell us what job you want. ChatGPT will ask you questions out loud and help you prepare.
+
+The primary start choices are:
+
+| Choice | Plain-language prompt | Product behaviour |
+|---|---|---|
+| **I have a job advert** | “Paste the job advert here.” | Use the advert to create role-specific practice. |
+| **Choose a job type** | “What kind of job are you applying for?” | Offer common starting points such as warehouse, restaurant, shop, delivery, care, technician, office, and other; collect a few plain-language details before creating practice. |
+| **I do not have an advert** | “Tell us the job title and where you will work.” | Start with useful common questions rather than blocking the person. |
+
+A resume is always optional: **“Add your CV if you have one.”** Never describe a person as
+having a “gap” on the front of the product. The underlying fit analysis may tailor practice,
+but its user-facing language is constructive: “Here is one thing they may ask you about.”
+
+The visible journey has three steps:
+
+1. **Tell us the job**
+2. **Answer out loud**
+3. **Get simple tips for next time**
+
+Buttons use everyday verbs: **Start practice**, **Next question**, **Show my tips**, and
+**Try again**. Do not use “Analyse”, “agent”, “tool call”, “WebMCP”, implementation phases,
+or character counters as primary product copy. “Works with ChatGPT” may appear as a small
+trust detail, never as the task the user is being asked to complete.
+
+The fixed scoring model remains useful internally for consistency, but the default report
+translates it into plain feedback: **Strong answer**, **Almost there**, and **Try adding one
+example**. Source quotes, numeric axes, and detailed model answers are secondary detail for
+users who want them. The experience must work by speaking or typing, and must not assume
+that someone owns a laptop, has a polished resume, or has previously interviewed for an
+office role.
+
+The current contest build starts from a pasted posting; the job-type and no-advert paths are
+the next product-surface requirement, not a reason to expose technical implementation
+details in the contest flow.
 
 ---
 
