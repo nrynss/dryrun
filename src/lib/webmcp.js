@@ -38,6 +38,7 @@ export function registerTools() {
       annotations: { untrustedContentHint: true },
       execute: async ({ posting }) => {
         session.agentSeen = true;
+        session.lastCallAt = Date.now();
         const result = setPosting(posting);
         return {
           content: [

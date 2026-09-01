@@ -20,6 +20,8 @@ export const session = $state({
   error: null,
   /** True once an agent has called any tool. Drives the status strip. */
   agentSeen: false,
+  /** @type {number|null} Millis of the most recent tool call. Drives the ChatGPT-line flash (design 3.3). T25-T30 formalize. */
+  lastCallAt: null,
 });
 
 export const MAX_POSTING_CHARS = 20_000;
