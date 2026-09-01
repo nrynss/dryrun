@@ -1,18 +1,15 @@
-import {
-  session,
-  setPosting,
-  setResume,
-  getBrief,
-  startInterview,
-  submitAnswer,
-  getVerdict,
-} from './session.svelte.js';
+import { session, setPosting } from './session.svelte.js';
 
 // document.modelContext is the form the challenge specifies.
 // navigator.modelContext is the compatibility fallback for older Chromium,
 // never the other way round.
 function modelContext() {
   return globalThis.document?.modelContext ?? globalThis.navigator?.modelContext ?? null;
+}
+
+/** Reports whether this browser exposes WebMCP at all. Drives the status strip. */
+export function hasModelContext() {
+  return modelContext() !== null;
 }
 
 /**
@@ -39,13 +36,27 @@ export function registerTools() {
         required: ['posting'],
       },
       annotations: { untrustedContentHint: true },
+      execute: async ({ posting }) => {
+        session.agentSeen = true;
+        const result = setPosting(posting);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: result.ok
+                ? `Stored the posting, ${result.chars} characters. The page is now ready.`
+                : result.error,
+            },
+          ],
+        };
+      },
     },
     { signal },
   );
 
-  // TODO: set_resume, get_brief, start_interview, submit_answer, get_verdict.
+  // TODO T30: set_resume, get_brief, start_interview, submit_answer, get_verdict.
   // submit_answer's description must state that the transcript is the USER'S
-  // SPOKEN ANSWER -- an agent that answers its own questions is a broken demo.
+  // SPOKEN ANSWER. An agent that answers its own questions is a broken demo.
 
   return () => controller.abort();
 }

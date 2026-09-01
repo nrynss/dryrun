@@ -32,7 +32,7 @@ linked Netlify project before it will answer.
 No API keys. Netlify injects credentials into the function at runtime, so there
 is no `.env` to fill in.
 
-See `project.md` for the full specification.
+See `dev-diary/project.md` for the full specification, and `dev-diary/task.md` for the build breakdown.
 
 ## License
 

@@ -1,0 +1,164 @@
+{
+  "_note": "Hand-written fixture. No model generated any of this. It ships so the demo still works when the analysis function is unreachable, and it lets the interface build with no server. Source quotes are short verbatim lines from the public posting, used for illustration.",
+  "role": "Manager, Technical Writing",
+  "company": "Walmart Connect, Walmart Global Tech India",
+  "location": "Bengaluru, Karnataka",
+  "brief": {
+    "confidence": "high",
+    "owns": [
+      "API reference documentation on the Walmart Developer Portal for two ad products, Sponsored Search and Onsite Display.",
+      "The intake queue for documentation requests, and hitting the SLAs attached to them.",
+      "The information architecture of the portal, meaning how a developer finds the right page at all.",
+      "Accuracy over time, since proofreading and maintenance are named before authoring."
+    ],
+    "study": [
+      "Retail media basics. Sponsored Search and Onsite Display are ad formats, and the API consumers are advertisers and agencies, not shoppers.",
+      "OpenAPI 3.x by hand. Be able to read a spec and say what is wrong with it, not just render one.",
+      "How Readme and similar portals generate reference pages from a spec, and where that breaks down.",
+      "Walmart Connect's public developer portal as it stands today, so you can name something you would change."
+    ],
+    "angles": [
+      "Whether you can work without a spec. The posting expects you to extract detail from busy engineers.",
+      "Whether 'Manager' means people or scope here. The responsibilities read as senior individual contributor work.",
+      "How you keep docs true after the API changes, which is the part most writers have no system for.",
+      "Whether you can prioritise under an SLA rather than write whatever arrives most loudly."
+    ]
+  },
+  "questions": [
+    {
+      "id": "q1",
+      "prompt": "You have a documentation queue with SLAs attached. Walk me through how you triage a week's requests, and tell me about a time you missed one.",
+      "sourceQuote": "Manage documentation requests and meet project management SLAs.",
+      "targetsGap": true
+    },
+    {
+      "id": "q2",
+      "prompt": "An engineer hands you an OpenAPI spec that renders cleanly but is wrong in three places. How do you find that before a developer does?",
+      "sourceQuote": "Experience with tools such as Swagger/OpenAPI, GitHub, and Jira",
+      "targetsGap": true
+    },
+    {
+      "id": "q3",
+      "prompt": "Describe getting technical detail out of an engineer who has no time for you and thinks the code is self-documenting.",
+      "sourceQuote": "Collaborate with subject-matter experts to gather information, review technical specifications",
+      "targetsGap": false
+    },
+    {
+      "id": "q4",
+      "prompt": "Take a developer portal you know. What is structurally wrong with how it is organised, and what would you change first?",
+      "sourceQuote": "Organize and structure technical content for optimal user experience.",
+      "targetsGap": false
+    },
+    {
+      "id": "q5",
+      "prompt": "You will document ad APIs for advertisers and agencies, not for shoppers. What do you need to learn about retail media before you can write a useful reference page?",
+      "sourceQuote": "Your work will directly support our Sponsored Search and Onsite Display product APIs",
+      "targetsGap": true
+    },
+    {
+      "id": "q6",
+      "prompt": "The title says Manager but the responsibilities read as hands-on writing. What are you expecting to own here, and what would change your mind about the role?",
+      "sourceQuote": "6+ years of experience in technical writing, engineering, product, or a related technical field",
+      "targetsGap": false
+    },
+    {
+      "id": "q7",
+      "prompt": "An endpoint changed last quarter and the docs still describe the old behaviour. How would you have caught that automatically?",
+      "sourceQuote": "Develop, maintain, and proofread API technical documentation for the developer portal.",
+      "targetsGap": false
+    },
+    {
+      "id": "q8",
+      "prompt": "A product manager tells you a feature ships Friday and asks for docs. It is Wednesday. What do you do, and what do you refuse to do?",
+      "sourceQuote": "Partner with Product Managers and Developers to document product capabilities and new features.",
+      "targetsGap": false
+    }
+  ],
+  "fitMatch": {
+    "confidence": "high",
+    "evidenced": [
+      {
+        "requirement": "Technical writing depth",
+        "evidence": "Six years of API and developer documentation, which clears the stated bar."
+      },
+      {
+        "requirement": "Markdown, HTML, version control",
+        "evidence": "Docs-as-code in a Git repository, with review through pull requests."
+      },
+      {
+        "requirement": "Cross-functional collaboration",
+        "evidence": "Worked directly with product and engineering on release documentation."
+      }
+    ],
+    "gaps": [
+      {
+        "requirement": "Retail media and advertising APIs",
+        "why": "No advertising or ad-tech domain anywhere in the history. This is the whole subject matter of the role.",
+        "size": 5
+      },
+      {
+        "requirement": "Owning an SLA-backed request queue",
+        "why": "Writing is evidenced. Running intake and prioritisation against a service level is not.",
+        "size": 4
+      },
+      {
+        "requirement": "OpenAPI as a source of truth",
+        "why": "Swagger appears as a tool used, not as a spec authored or reviewed for correctness.",
+        "size": 3
+      },
+      {
+        "requirement": "Portal information architecture",
+        "why": "Page-level writing is evidenced. Restructuring a whole portal is not.",
+        "size": 2
+      }
+    ]
+  },
+  "scores": [
+    {
+      "questionId": "q1",
+      "answer": "So we ran a shared queue in Jira. Anything tied to a release got dated against the release, everything else got a size and went into a weekly grooming. I missed one badly, an SDK migration guide, because it came in as a comment on an unrelated ticket and never got a card. After that we made one intake form the only door in, and I checked it every morning before anything else.",
+      "scores": {
+        "specificity": 5,
+        "evidence": 4,
+        "structure": 4,
+        "relevance": 4
+      },
+      "missed": [
+        "Did not say what the SLA actually was in hours or days.",
+        "No mention of what happens when two SLA items collide on the same day."
+      ],
+      "modelAnswer": "Name the tool and the actual SLA. Describe triage on two axes, release-coupled versus standalone, and say who breaks ties. Then give one real miss, its root cause, and the process change that followed. Close with the number that proves the change worked."
+    },
+    {
+      "questionId": "q2",
+      "answer": "I would read through the spec and compare it against what the endpoint actually does. Usually you find the examples are stale, or a field is marked required when it is not. I would try the calls myself if I could get a key.",
+      "scores": {
+        "specificity": 3,
+        "evidence": 2,
+        "structure": 3,
+        "relevance": 4
+      },
+      "missed": [
+        "No mention of contract testing or spec linting, which is how this is caught at scale.",
+        "No worked example of an error actually found.",
+        "Did not mention diffing the spec between versions in the repository."
+      ],
+      "modelAnswer": "Start from the failure modes: stale examples, wrong required flags, enums that drift, error responses nobody documents. Then describe catching them mechanically, by linting the spec in CI and diffing it per pull request, and by running the examples as tests. Finish with a concrete bug you found this way and what it would have cost a developer."
+    },
+    {
+      "questionId": "q3",
+      "answer": "I usually just send them a draft with the parts I got wrong on purpose. People who will not answer questions will absolutely correct a mistake. It turns a request for their time into a two minute review.",
+      "scores": {
+        "specificity": 4,
+        "evidence": 3,
+        "structure": 3,
+        "relevance": 5
+      },
+      "missed": [
+        "No named instance, so it reads as a technique rather than something lived.",
+        "Did not say what to do when the draft comes back with no corrections and no approval."
+      ],
+      "modelAnswer": "Lead with the tactic, which is strong, then anchor it in one named case: the engineer, the feature, and what the deliberate error surfaced. Add the escalation path for silence, and note how you keep this from reading as manipulation to a colleague who spots it."
+    }
+  ]
+}

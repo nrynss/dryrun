@@ -5,11 +5,18 @@
 [functions]
   directory = "netlify/functions"
 
-# WebMCP is only exposed in origin-isolated documents, so the HTML document
-# MUST carry Origin-Agent-Cluster. Permissions-Policy is already the default;
-# set explicitly so the requirement is visible in the repo.
+# Chrome exposes WebMCP only in origin-isolated documents, so the HTML
+# document MUST carry Origin-Agent-Cluster. Permissions-Policy already
+# defaults to this value. We set it explicitly so the repo shows the
+# requirement.
 [[headers]]
   for = "/*"
   [headers.values]
     Origin-Agent-Cluster = "?1"
     Permissions-Policy = "tools=(self)"
+    # WebMCP origin trial, Chrome 149 to 156, both expire 17 Nov 2026.
+    # Without a token the API is absent for anyone who has not set
+    # chrome://flags, which is every judge. One token per origin, so both
+    # hosts are covered. Chrome takes a comma-separated list and ignores
+    # whichever does not match. These are public by design.
+    Origin-Trial = "AmY4Y+wMqOwbBkRYleJRpqgcKHe9qOMVTPMD4lHw42Q6nvUCHUxd0cIClSk1pZWHSuv5/hMmrlREc/42fKGhagQAAABieyJvcmlnaW4iOiJodHRwczovL2RyeXJ1bi5ucnluLmRldjo0NDMiLCJmZWF0dXJlIjoiV2ViTUNQIiwiZXhwaXJ5IjoxNzk0ODczNjAwLCJpc1N1YmRvbWFpbiI6dHJ1ZX0=,Aut56FxzAQZOstu7tkvO9Tp+DvMZ3pJQ9jFr1GKNmipi1orn/QKRS9ykNmuJhMIDfm0E7sadxwgXk25g+BWr9wsAAABpeyJvcmlnaW4iOiJodHRwczovL2RyeXJ1bi05NjMubmV0bGlmeS5hcHA6NDQzIiwiZmVhdHVyZSI6IldlYk1DUCIsImV4cGlyeSI6MTc5NDg3MzYwMCwiaXNTdWJkb21haW4iOnRydWV9"

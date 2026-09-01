@@ -3,11 +3,17 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Dry Run — the interview before the interview</title>
+    <title>Dry Run: the interview before the interview</title>
     <meta
       name="description"
       content="Paste a job posting. Dry Run builds a brief and eight grounded questions, ChatGPT runs the interview aloud, and the page scores every answer."
     />
+    <meta name="color-scheme" content="dark" />
+    <style>
+      /* Dry Run ships dark only. Declaring it here, before the app CSS loads,
+         makes the browser match its own chrome and avoids a white flash. */
+      :root { color-scheme: dark; background: #0A0A0C; }
+    </style>
   </head>
   <body>
     <div id="app"></div>

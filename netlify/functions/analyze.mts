@@ -1,11 +1,11 @@
 import OpenAI from 'openai';
 
-// The only server code. Fixed prompts, structured outputs, no conversation --
-// the interview itself runs on the user's own ChatGPT.
+// The only server code. Fixed prompts, structured outputs, no conversation.
+// The interview itself runs on the user's own ChatGPT.
 const MODEL = 'gpt-5.6-luna';
 
-// Judging runs 4-21 September with no ability to redeploy, so the guard that
-// matters is an input cap: an oversized paste is the only way to burn real
+// Judging runs 4-21 September and we cannot redeploy. So the guard that
+// matters is an input cap. An oversized paste is the only way to burn real
 // money on a single request.
 const MAX_INPUT_CHARS = 20_000;
 
