@@ -100,7 +100,7 @@ function connect(url) {
 test('Choose a file label activates its associated hidden file input in a real browser', async (t) => {
   const [appPort, debugPort] = await Promise.all([availablePort(), availablePort()]);
   const profile = await mkdtemp(join(tmpdir(), 'dryrun-file-chooser-'));
-  const server = start('./node_modules/.bin/vite', ['--host', '127.0.0.1', '--port', String(appPort), '--strictPort']);
+  const server = start('./node_modules/.bin/vite', ['--config', 'vite.test.config.js', '--host', '127.0.0.1', '--port', String(appPort), '--strictPort']);
   const chrome = start('/usr/bin/google-chrome-stable', [
     '--headless=new', '--no-sandbox', '--disable-gpu', `--remote-debugging-port=${debugPort}`,
     `--user-data-dir=${profile}`, 'about:blank',
@@ -170,7 +170,7 @@ test('the live chooser exposes the exact always-visible privacy copy and warns w
   const unsupportedPath = join(fixtureDir, 'not-a-resume.docx');
   await writeFile(resumePath, 'A'.repeat(20_001));
   await writeFile(unsupportedPath, 'not actually a Word document');
-  const server = start('./node_modules/.bin/vite', ['--host', '127.0.0.1', '--port', String(appPort), '--strictPort']);
+  const server = start('./node_modules/.bin/vite', ['--config', 'vite.test.config.js', '--host', '127.0.0.1', '--port', String(appPort), '--strictPort']);
   const chrome = start('/usr/bin/google-chrome-stable', [
     '--headless=new', '--no-sandbox', '--disable-gpu', `--remote-debugging-port=${debugPort}`,
     `--user-data-dir=${profile}`, 'about:blank',
@@ -312,7 +312,7 @@ test('the live chooser keeps PDF-specific failures separate and preserves a past
   ]);
   await writeFile(rejectedTextPath, 'Short CV text');
 
-  const server = start('./node_modules/.bin/vite', ['--host', '127.0.0.1', '--port', String(appPort), '--strictPort']);
+  const server = start('./node_modules/.bin/vite', ['--config', 'vite.test.config.js', '--host', '127.0.0.1', '--port', String(appPort), '--strictPort']);
   const chrome = start('/usr/bin/google-chrome-stable', [
     '--headless=new', '--no-sandbox', '--disable-gpu', `--remote-debugging-port=${debugPort}`,
     `--user-data-dir=${profile}`, 'about:blank',

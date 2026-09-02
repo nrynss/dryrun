@@ -39,7 +39,7 @@ export function registerTools() {
       execute: async ({ posting }) => {
         session.agentSeen = true;
         session.lastCallAt = Date.now();
-        const result = setPosting(posting);
+        const result = await setPosting(posting);
         return {
           content: [
             {

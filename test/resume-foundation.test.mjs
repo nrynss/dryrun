@@ -68,8 +68,9 @@ test('the chooser resolves the PDF worker through Vite and keeps pasted text in 
 
 test('the Practice component keeps a low-confidence CV notice non-blocking', async (t) => {
   const vite = await createServer({
-    configFile: new URL('../vite.config.js', import.meta.url).pathname,
-    server: { middlewareMode: true },
+    configFile: new URL('../vite.test.config.js', import.meta.url).pathname,
+    // This is an SSR-only module loader; it has no browser HMR client.
+    server: { middlewareMode: true, hmr: false, ws: false },
     appType: 'custom',
   });
   t.after(() => vite.close());
