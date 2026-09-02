@@ -986,11 +986,11 @@ Placeholders in braces are substituted at render time.
 |---|---|
 | `app.name` | Dry Run |
 | `app.promise` | Practise your job interview |
-| `app.sub` | Tell us what job you want. ChatGPT will ask you questions out loud and help you prepare. |
+| `app.sub` | Tell us about the job. Dry Run will help you prepare for the questions they may ask. |
 | `app.sub_typing` | Answer the questions this employer is likely to ask. Then get simple tips for next time. |
 | `app.trust` | Works with ChatGPT |
 | `step.1` | Tell us the job |
-| `step.2` | Answer out loud |
+| `step.2` | Practise your answers |
 | `step.3` | Get simple tips for next time |
 
 Use `app.sub` when `document.modelContext` exists. Use `app.sub_typing`
@@ -1006,6 +1006,7 @@ otherwise. See Section 15.3 for why.
 | `btn.again` | Try again |
 | `btn.skip` | Skip this one |
 | `btn.finish_early` | Finish and show my tips |
+| `btn.end_practice` | End practice and start over |
 | `btn.different_job` | Practise a different job |
 | `btn.print` | Print or save these tips |
 | `btn.choose_file` | Choose a file |
@@ -1016,6 +1017,7 @@ otherwise. See Section 15.3 for why.
 | `btn.see_scores` | See the scores |
 | `btn.see_numbers` | See the numbers |
 | `btn.show_all` | Show all |
+| `btn.show_less` | Show less |
 | `btn.back` | Back |
 
 ### 11.3 Start screen
@@ -1075,13 +1077,13 @@ otherwise. See Section 15.3 for why.
 |---|---|
 | `practice.progress` | Question {n} of 8 |
 | `practice.answer_label` | Your answer |
-| `practice.answer_placeholder` | Type your answer here, or say it out loud in ChatGPT. |
-| `practice.answer_placeholder_typing` | Type your answer here. Write it how you would say it. |
-| `practice.hint` | There is no time limit. Say it how you would say it in the room. |
+| `practice.answer_placeholder` | Write your answer here, or practise it in your own way. |
+| `practice.answer_placeholder_typing` | Write your answer here. Use the words that feel natural to you. |
+| `practice.hint` | Take your time. Use the words that feel natural to you. |
 | `hint.waiting` | Waiting for your answer. |
 | `busy.scoring` | Reading your answer |
-| `busy.brief` | Getting your questions ready. |
-| `busy.brief_sub` | This takes about ten seconds. |
+| `busy.brief` | Putting your practice together. |
+| `busy.brief_sub` | You can stay here while we get things ready. |
 
 Use `practice.answer_placeholder` when `document.modelContext` exists. Use
 `practice.answer_placeholder_typing` otherwise.
@@ -1132,9 +1134,9 @@ fine.
 
 | Key | String |
 |---|---|
-| `chat.none` | You are typing your answers. That works just as well. |
-| `chat.ready` | Ready for ChatGPT. Ask it to start your practice, or type your answers here. |
-| `chat.active` | ChatGPT is running your practice. This page updates while you talk. |
+| `chat.none` | You can practise here in your own way. |
+| `chat.ready` | ChatGPT can help with your practice. You can also continue here in your own way. |
+| `chat.active` | ChatGPT is helping with your practice. This page updates as you go. |
 | `chat.flash` | ChatGPT just updated this page. |
 
 ### 11.9 Errors, warnings and notices
@@ -1150,13 +1152,13 @@ fine.
 | `warn.cv_long` | Your CV was long, so we used the first part of it. That is usually enough. |
 | `warn.not_cv` | That file did not read like a CV, so we skipped that part. Your questions still come from the job advert. |
 | `warn.thin_advert` | The advert was short, so these questions are more general. They are still worth practising. |
-| `err.service_down` | We cannot build new questions right now. Try again in a minute. |
+| `err.service_down` | We cannot build new questions right now. Please try again later. |
 | `err.service_down_action` | Or look at a full worked example while you wait. |
 | `notice.example` | This is a worked example for a technical writing job. It is here so you can see how Dry Run works. |
 | `err.score_failed` | We could not read that answer. Your answer is saved. Try again, or move on. |
 | `err.empty_answer` | Type your answer first, or skip this question. |
-| `err.answer_long` | That answer is very long. Shorten it to the part you would actually say out loud. |
-| `err.unknown` | Something went wrong. Try again in a minute. |
+| `err.answer_long` | That answer is very long. Keep the part that best shows what you did. |
+| `err.unknown` | Something went wrong. Please try again later. |
 
 Every one of these is a complete sentence in plain words. None of them names a
 file format in lower case with a dot, a status code, a function, or a limit

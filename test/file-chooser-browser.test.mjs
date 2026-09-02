@@ -447,6 +447,6 @@ test('the live chooser keeps PDF-specific failures separate and preserves a past
     })`,
   }, sessionId);
   await selectFile(rejectedTextPath);
-  await expectFailure('Something went wrong. Try again in a minute.', 'the TXT read failure');
+  await expectFailure('Something went wrong. Please try again later.', 'the TXT read failure');
 
 });

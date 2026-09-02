@@ -739,7 +739,7 @@ test('T28 preserves an answer on score failure and rejects stale score completio
     ok: false, error: 'Type your answer first, or skip this question.',
   });
   assert.deepEqual(await submitAnswer('x'.repeat(MAX_ANSWER_CHARS + 1), { request: () => assert.fail('long answer must not call') }), {
-    ok: false, error: 'That answer is very long. Shorten it to the part you would actually say out loud.',
+    ok: false, error: 'That answer is very long. Keep the part that best shows what you did.',
   });
   const failed = await submitAnswer('Keep this answer.', {
     request: async () => response({ error: 'Temporary scoring failure.', code: 'upstream_failed' }, 503),

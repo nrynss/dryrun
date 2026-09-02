@@ -14,13 +14,13 @@ export const copy = {
   app: {
     name: 'Dry Run',
     promise: 'Practise your job interview',
-    sub: 'Tell us what job you want. ChatGPT will ask you questions out loud and help you prepare.',
+    sub: 'Tell us about the job. Dry Run will help you prepare for the questions they may ask.',
     sub_typing: 'Answer the questions this employer is likely to ask. Then get simple tips for next time.',
     trust: 'Works with ChatGPT',
   },
   step: {
     1: 'Tell us the job',
-    2: 'Answer out loud',
+    2: 'Practise your answers',
     3: 'Get simple tips for next time',
   },
 
@@ -100,17 +100,17 @@ export const copy = {
   practice: {
     progress: 'Question {n} of 8',
     answer_label: 'Your answer',
-    answer_placeholder: 'Type your answer here, or say it out loud in ChatGPT.',
-    answer_placeholder_typing: 'Type your answer here. Write it how you would say it.',
-    hint: 'There is no time limit. Say it how you would say it in the room.',
+    answer_placeholder: 'Write your answer here, or practise it in your own way.',
+    answer_placeholder_typing: 'Write your answer here. Use the words that feel natural to you.',
+    hint: 'Take your time. Use the words that feel natural to you.',
   },
   hint: {
     waiting: 'Waiting for your answer.',
   },
   busy: {
     scoring: 'Reading your answer',
-    brief: 'Getting your questions ready.',
-    brief_sub: 'This takes about ten seconds.',
+    brief: 'Putting your practice together.',
+    brief_sub: 'You can stay here while we get things ready.',
   },
 
   /* 11.6 Feedback on one answer */
@@ -157,9 +157,9 @@ export const copy = {
 
   /* 11.8 ChatGPT line */
   chat: {
-    none: 'You are typing your answers. That works just as well.',
-    ready: 'Ready for ChatGPT. Ask it to start your practice, or type your answers here.',
-    active: 'ChatGPT is running your practice. This page updates while you talk.',
+    none: 'You can practise here in your own way.',
+    ready: 'ChatGPT can help with your practice. You can also continue here in your own way.',
+    active: 'ChatGPT is helping with your practice. This page updates as you go.',
     flash: 'ChatGPT just updated this page.',
   },
 
@@ -170,12 +170,12 @@ export const copy = {
     pdf_scan: 'We could not find any words in that file. It looks like a photo or a scan. Copy your CV text and paste it instead.',
     pdf_locked: 'That file is locked with a password. Upload a copy without the password, or paste the text instead.',
     file_type: 'We can read PDF, TXT and MD files. For anything else, copy the text and paste it.',
-    service_down: 'We cannot build new questions right now. Try again in a minute.',
+    service_down: 'We cannot build new questions right now. Please try again later.',
     service_down_action: 'Or look at a full worked example while you wait.',
     score_failed: 'We could not read that answer. Your answer is saved. Try again, or move on.',
     empty_answer: 'Type your answer first, or skip this question.',
-    answer_long: 'That answer is very long. Shorten it to the part you would actually say out loud.',
-    unknown: 'Something went wrong. Try again in a minute.',
+    answer_long: 'That answer is very long. Keep the part that best shows what you did.',
+    unknown: 'Something went wrong. Please try again later.',
   },
   warn: {
     near_limit: 'You are close to the limit. Keep the duties and the requirements, and cut the rest.',
