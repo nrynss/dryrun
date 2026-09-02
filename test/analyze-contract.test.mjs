@@ -134,9 +134,16 @@ test('post-parse validators enforce strict object shapes and all schema bounds',
   const score = structuredClone(validScore);
   score.unexpected = true;
   score.scores.unexpected = 5;
-  score.missed = Array.from({ length: 7 }, () => 'm'.repeat(241));
-  score.modelAnswer = 'a'.repeat(901);
+  score.missed = Array.from({ length: 7 }, () => 'm'.repeat(321));
+  score.modelAnswer = 'a'.repeat(1401);
   assert.ok(validateScoreResponse(score).length > 0);
+});
+
+test('validateScoreResponse accepts up to 1400 chars for modelAnswer and 320 chars for missed points', () => {
+  const score = structuredClone(validScore);
+  score.missed = ['m'.repeat(320)];
+  score.modelAnswer = 'a'.repeat(1400);
+  assert.deepEqual(validateScoreResponse(score), []);
 });
 
 test('analysis endpoint rejects invalid requests before contacting the provider', async () => {

@@ -274,7 +274,7 @@ export function validateScoreResponse(data) {
     const v = data.scores[axis];
     if (!Number.isInteger(v) || v < 1 || v > 5) problems.push(`Axis ${axis} is not an integer from 1 to 5.`);
   }
-  if (!Array.isArray(data.missed) || data.missed.length > 6 || data.missed.some((point) => !isBoundedString(point, 240))) problems.push('Missing missed points array.');
-  if (!isBoundedString(data.modelAnswer, 900)) problems.push('Missing model answer.');
+  if (!Array.isArray(data.missed) || data.missed.length > 6 || data.missed.some((point) => !isBoundedString(point, 320))) problems.push('Missing missed points array.');
+  if (!isBoundedString(data.modelAnswer, 1400)) problems.push('Missing model answer.');
   return problems;
 }
