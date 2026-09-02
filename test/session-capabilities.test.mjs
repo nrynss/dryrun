@@ -36,6 +36,27 @@ function response(body, status = 200) {
   });
 }
 
+function scoreResponse(value = 4) {
+  return {
+    scores: { specificity: value, evidence: value, structure: value, relevance: value },
+    missed: ['Name one concrete example.'],
+    modelAnswer: 'Give one relevant example, explain what you did, and name the result.',
+    meta: { usage: { model: 'mock' } },
+  };
+}
+
+function memoryStorage(initial = {}) {
+  const values = new Map(Object.entries(initial));
+  const removed = [];
+  return {
+    getItem(key) { return values.get(key) ?? null; },
+    setItem(key, value) { values.set(key, value); },
+    removeItem(key) { removed.push(key); values.delete(key); },
+    values,
+    removed,
+  };
+}
+
 function deferred() {
   let resolve;
   const promise = new Promise((finish) => { resolve = finish; });
@@ -654,4 +675,240 @@ test('T25 invalid CV superseding the first posting restores its stable idle proj
     assert.equal(session.serviceDown, false, postingCompletion);
     assert.deepEqual(session.questions, [], postingCompletion);
   }
+});
+
+test('T28 submits bounded saved context, stores a score, advances, and returns the final verdict', async (t) => {
+  const vite = await createServer({
+    configFile: new URL('../vite.test.config.js', import.meta.url).pathname,
+    server: { middlewareMode: true, hmr: false, ws: false }, appType: 'custom',
+  });
+  t.after(() => vite.close());
+  const { session, setPosting, startInterview, submitAnswer, getVerdict } = await vite.ssrLoadModule('/src/lib/session.svelte.js');
+  reset(session);
+  await setPosting(posting, { request: async () => response(briefResponse()) });
+  startInterview();
+
+  const calls = [];
+  const first = await submitAnswer('  I fixed a stale API guide after speaking with the engineers.  ', {
+    request: async (url, options) => {
+      calls.push({ url, options });
+      return response(scoreResponse(4));
+    },
+  });
+  assert.equal(first.ok, true);
+  assert.equal(first.question.id, 'q2');
+  assert.equal(session.current, 1);
+  assert.equal(session.phase, 'interviewing');
+  assert.equal(session.questions[0].answer, 'I fixed a stale API guide after speaking with the engineers.');
+  assert.deepEqual(session.questions[0].scores, scoreResponse(4).scores);
+  assert.equal(session.scoring, false);
+  assert.deepEqual(JSON.parse(calls[0].options.body), {
+    task: 'score',
+    answer: 'I fixed a stale API guide after speaking with the engineers.',
+    question: {
+      id: 'q1', prompt: 'Question 1: how would you explain this change?', sourceQuote: posting, targetsGap: false,
+    },
+    brief: session.brief,
+  });
+
+  for (let index = 1; index < 8; index += 1) {
+    const result = await submitAnswer(`Answer ${index + 1}`, { request: async () => response(scoreResponse(4)) });
+    if (index < 7) assert.equal(result.question.id, `q${index + 2}`);
+    else {
+      assert.deepEqual(result.verdict, { band: 'ready', average: 4, answered: 8, total: 8, capped: false });
+    }
+  }
+  assert.equal(session.phase, 'done');
+  assert.deepEqual(getVerdict(), { band: 'ready', average: 4, answered: 8, total: 8, capped: false });
+});
+
+test('T28 preserves an answer on score failure and rejects stale score completion after navigation or edits', async (t) => {
+  const vite = await createServer({
+    configFile: new URL('../vite.test.config.js', import.meta.url).pathname,
+    server: { middlewareMode: true, hmr: false, ws: false }, appType: 'custom',
+  });
+  t.after(() => vite.close());
+  const { session, setPosting, startInterview, submitAnswer, MAX_ANSWER_CHARS } = await vite.ssrLoadModule('/src/lib/session.svelte.js');
+  reset(session);
+  assert.deepEqual(await submitAnswer('answer', { request: () => assert.fail('unready session must not call') }), {
+    ok: false, error: 'Start the interview before submitting an answer.',
+  });
+  await setPosting(posting, { request: async () => response(briefResponse()) });
+  startInterview();
+  assert.deepEqual(await submitAnswer('  ', { request: () => assert.fail('empty answer must not call') }), {
+    ok: false, error: 'Type your answer first, or skip this question.',
+  });
+  assert.deepEqual(await submitAnswer('x'.repeat(MAX_ANSWER_CHARS + 1), { request: () => assert.fail('long answer must not call') }), {
+    ok: false, error: 'That answer is very long. Shorten it to the part you would actually say out loud.',
+  });
+  const failed = await submitAnswer('Keep this answer.', {
+    request: async () => response({ error: 'Temporary scoring failure.', code: 'upstream_failed' }, 503),
+  });
+  assert.deepEqual(failed, { ok: false, status: 503, code: 'upstream_failed', error: 'Temporary scoring failure.' });
+  assert.equal(session.questions[0].answer, 'Keep this answer.');
+  assert.equal(session.questions[0].scores, null);
+  assert.equal(session.scoreFailed, true);
+  assert.equal(session.scoring, false);
+
+  const held = deferred();
+  const stale = submitAnswer('Original answer.', { request: async () => held.promise });
+  assert.equal(session.scoring, true);
+  session.questions[0].answer = 'Edited while the score was in flight.';
+  held.resolve(response(scoreResponse(5)));
+  assert.deepEqual(await stale, { ok: false, code: 'superseded' });
+  assert.equal(session.questions[0].answer, 'Edited while the score was in flight.');
+  assert.equal(session.questions[0].scores, null);
+  assert.equal(session.current, 0);
+  assert.equal(session.scoring, false);
+
+  const heldReplacement = deferred();
+  let scoreSignal;
+  const replaced = submitAnswer('Answer for the old posting.', {
+    request: async (url, options) => {
+      scoreSignal = options.signal;
+      return heldReplacement.promise;
+    },
+  });
+  const newerPosting = 'Explain an incident to a warehouse team.';
+  await setPosting(newerPosting, {
+    request: async () => response(briefResponse({ sourceQuote: newerPosting, questionPrefix: 'NEW' })),
+  });
+  assert.equal(scoreSignal.aborted, true);
+  heldReplacement.resolve(response(scoreResponse(5)));
+  assert.deepEqual(await replaced, { ok: false, code: 'superseded' });
+  assert.equal(session.posting, newerPosting);
+  assert.equal(session.questions[0].answer, null);
+  assert.equal(session.questions[0].scores, null);
+});
+
+test('T28 restart repro cannot associate a former score with a failed replacement transcript', async (t) => {
+  const vite = await createServer({
+    configFile: new URL('../vite.test.config.js', import.meta.url).pathname,
+    server: { middlewareMode: true, hmr: false, ws: false }, appType: 'custom',
+  });
+  t.after(() => vite.close());
+  const { session, setPosting, startInterview, submitAnswer, getVerdict } = await vite.ssrLoadModule('/src/lib/session.svelte.js');
+  reset(session);
+  await setPosting(posting, { request: async () => response(briefResponse()) });
+  assert.equal(startInterview().ok, true);
+  assert.equal((await submitAnswer('First transcript.', {
+    request: async () => response(scoreResponse(5)),
+  })).ok, true);
+
+  // Reviewer reproduction: a public restart call is rejected after scoring,
+  // and a replacement transcript clears every old scoring artifact even when
+  // the score endpoint returns 503.
+  assert.deepEqual(startInterview(), {
+    ok: false, error: 'Start a new practice plan before starting another interview.',
+  });
+  session.current = 0;
+  const replacement = await submitAnswer('Replacement answer.', {
+    request: async () => response({ error: 'Temporary scoring failure.', code: 'upstream_failed' }, 503),
+  });
+  assert.equal(replacement.ok, false);
+  assert.equal(session.questions[0].answer, 'Replacement answer.');
+  assert.equal(session.questions[0].scores, null);
+  assert.deepEqual(session.questions[0].missed, []);
+  assert.equal(session.questions[0].modelAnswer, undefined);
+  assert.deepEqual(getVerdict(), { band: 'not yet', average: 0, answered: 0, total: 8, capped: false });
+});
+
+test('T29 calculates from complete valid scores and caps incomplete high-score sessions', async (t) => {
+  const vite = await createServer({
+    configFile: new URL('../vite.test.config.js', import.meta.url).pathname,
+    server: { middlewareMode: true, hmr: false, ws: false }, appType: 'custom',
+  });
+  t.after(() => vite.close());
+  const { session, setPosting, getVerdict } = await vite.ssrLoadModule('/src/lib/session.svelte.js');
+  reset(session);
+  await setPosting(posting, { request: async () => response(briefResponse()) });
+  for (let index = 0; index < 3; index += 1) {
+    Object.assign(session.questions[index], {
+      answer: `Good answer ${index + 1}`,
+      scores: scoreResponse(5).scores,
+      missed: scoreResponse(5).missed,
+      modelAnswer: scoreResponse(5).modelAnswer,
+    });
+  }
+  assert.deepEqual(getVerdict(), { band: 'not yet', average: 5, answered: 3, total: 8, capped: true });
+
+  // A malformed direct mutation is not an answer score and cannot inflate a
+  // result that a skipped or incomplete session reports.
+  Object.assign(session.questions[3], {
+    answer: 'Corrupt score must not count.',
+    scores: { specificity: 99 },
+    missed: [],
+    modelAnswer: 'Broken',
+  });
+  assert.deepEqual(getVerdict(), { band: 'not yet', average: 5, answered: 3, total: 8, capped: true });
+  for (let index = 3; index < 8; index += 1) {
+    Object.assign(session.questions[index], {
+      answer: `Nearly answer ${index + 1}`,
+      scores: scoreResponse(3).scores,
+      missed: scoreResponse(3).missed,
+      modelAnswer: scoreResponse(3).modelAnswer,
+      skipped: false,
+    });
+  }
+  assert.deepEqual(getVerdict(), { band: 'nearly', average: 3.75, answered: 8, total: 8, capped: false });
+});
+
+test('T30 restores only versioned valid state and safely discards corrupt or stale storage', async (t) => {
+  const vite = await createServer({
+    configFile: new URL('../vite.test.config.js', import.meta.url).pathname,
+    server: { middlewareMode: true, hmr: false, ws: false }, appType: 'custom',
+  });
+  t.after(() => vite.close());
+  const capabilities = await vite.ssrLoadModule('/src/lib/session.svelte.js');
+  const { session, setPosting, setResume, persistSession, restoreSession, SESSION_STORAGE_KEY, SESSION_STORAGE_VERSION } = capabilities;
+  reset(session);
+  await setPosting(posting, { request: async () => response(briefResponse()) });
+  session.questions[0].answer = 'A saved answer.';
+  session.questions[0].scores = scoreResponse(4).scores;
+  session.questions[0].missed = scoreResponse(4).missed;
+  session.questions[0].modelAnswer = scoreResponse(4).modelAnswer;
+  session.current = 1;
+  session.phase = 'interviewing';
+  const storage = memoryStorage();
+  assert.equal(persistSession(storage), true);
+  const saved = JSON.parse(storage.getItem(SESSION_STORAGE_KEY));
+  assert.equal(saved.version, SESSION_STORAGE_VERSION);
+  assert.equal(Object.hasOwn(saved.session, 'resume'), false);
+  assert.equal(saved.session.error, undefined);
+  assert.equal(saved.session.scoring, undefined);
+
+  reset(session);
+  session.error = 'Transient state must not return.';
+  session.agentSeen = true;
+  assert.equal(restoreSession(storage), true);
+  assert.equal(session.phase, 'interviewing');
+  assert.equal(session.current, 1);
+  assert.equal(session.questions[0].answer, 'A saved answer.');
+  assert.deepEqual(session.questions[0].scores, scoreResponse(4).scores);
+  assert.equal(session.error, null);
+  assert.equal(session.agentSeen, false);
+
+  const corrupt = memoryStorage({ [SESSION_STORAGE_KEY]: '{not json' });
+  assert.equal(restoreSession(corrupt), false);
+  assert.deepEqual(corrupt.removed, [SESSION_STORAGE_KEY]);
+  const stale = memoryStorage({ [SESSION_STORAGE_KEY]: JSON.stringify({ version: SESSION_STORAGE_VERSION - 1, session: saved.session }) });
+  assert.equal(restoreSession(stale), false);
+  assert.deepEqual(stale.removed, [SESSION_STORAGE_KEY]);
+
+  // The required copy says the CV is never saved. CV-backed state therefore
+  // clears any older snapshot rather than serializing the raw text or its
+  // derived fit/gap analysis; old version-1 records are removed on sight.
+  const cv = 'Jane Candidate CV: home address 1 Private Street';
+  await setResume(cv, { request: async () => response(briefResponse({ withResume: true })) });
+  assert.equal(persistSession(storage), false);
+  assert.equal(storage.getItem(SESSION_STORAGE_KEY), null);
+  const legacy = memoryStorage({
+    [SESSION_STORAGE_KEY]: JSON.stringify({
+      version: 1,
+      session: { ...saved.session, resume: cv, fitMatch: briefResponse({ withResume: true }).fitMatch },
+    }),
+  });
+  assert.equal(restoreSession(legacy), false);
+  assert.equal(legacy.getItem(SESSION_STORAGE_KEY), null);
+  assert.deepEqual(legacy.removed, [SESSION_STORAGE_KEY]);
 });

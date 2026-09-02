@@ -1,4 +1,4 @@
-import { validateBriefResponse } from './shapes.js';
+import { buildVerdict, validateBriefResponse, validateScoreResponse } from './shapes.js';
 import { copy } from './copy.js';
 
 // The capability layer. Both callers go through this file. The UI reads
@@ -57,6 +57,18 @@ export const MAX_ANSWER_CHARS = 6_000;
 // response already on its way back) need not honour AbortSignal.
 let briefRequestGeneration = 0;
 let activeBriefController = null;
+
+// Scoring is a distinct request stream from brief generation. One submitted
+// answer may only update the question it was made for; a later session change,
+// navigation, or answer edit makes its eventual response stale.
+let scoreRequestGeneration = 0;
+let activeScoreController = null;
+
+export const SESSION_STORAGE_KEY = 'dry-run.session.v1';
+// Version 1 saved the raw CV, which conflicts with the browser-visible
+// privacy promise. Keep the key so existing records can be actively removed,
+// but reject their old envelope and write only the CV-free version 2 shape.
+export const SESSION_STORAGE_VERSION = 2;
 
 // Keep the accepted resume/brief/questions set outside the reactive draft.
 // The Start screen will bind its CV field directly to session.resume in T32;
@@ -216,6 +228,7 @@ function applyBriefProjection(projection) {
 }
 
 function beginBriefRequest() {
+  supersedeActiveScoreRequest();
   activeBriefController?.abort();
   const controller = new AbortController();
   activeBriefController = controller;
@@ -229,6 +242,30 @@ function supersedeActiveBriefRequest() {
   activeBriefController?.abort();
   activeBriefController = null;
   ++briefRequestGeneration;
+}
+
+function beginScoreRequest() {
+  const controller = new AbortController();
+  activeScoreController = controller;
+  return { generation: ++scoreRequestGeneration, controller };
+}
+
+function supersedeActiveScoreRequest() {
+  activeScoreController?.abort();
+  activeScoreController = null;
+  ++scoreRequestGeneration;
+  session.scoring = false;
+}
+
+function isCurrentScoreRequest(generation) {
+  return generation === scoreRequestGeneration;
+}
+
+function finishScoreRequest(generation, controller) {
+  if (isCurrentScoreRequest(generation) && activeScoreController === controller) {
+    activeScoreController = null;
+    session.scoring = false;
+  }
 }
 
 function isCurrentBriefRequest(generation) {
@@ -309,6 +346,7 @@ function settlePostingValidation(problem) {
   // invalid input is nevertheless the newest operation, so it owns a quiet
   // start-state projection and must retire every older request/result.
   supersedeActiveBriefRequest();
+  supersedeActiveScoreRequest();
   lastAcceptedBriefProjection = null;
   initialBriefProjection = null;
   session.brief = null;
@@ -377,6 +415,9 @@ export async function setPosting(text, { request = globalThis.fetch } = {}) {
  * so the returned set naturally re-aims roughly one third of the interview.
  */
 export async function setResume(text, { request = globalThis.fetch } = {}) {
+  // A brief/CV change replaces the question set, so no score for its former
+  // question may remain active.
+  supersedeActiveScoreRequest();
   const resume = normalizeText(text);
   // The CV textarea can update session.resume before this capability runs.
   // Capture the accepted projection first so local validation failures undo
@@ -428,16 +469,298 @@ export function startInterview() {
   if (!session.brief || !session.questions.length) {
     return inputError('Build your practice questions before starting the interview.');
   }
+  // Starting is a one-way transition from the untouched plan. A public
+  // capability must not silently restart an interview whose answers have
+  // already been scored: scores are inseparable from their transcript.
+  const pristine = session.phase === 'ready' && session.questions.every((question) => (
+    question.answer === null
+    && question.scores === null
+    && question.missed?.length === 0
+    && question.modelAnswer === undefined
+    && question.skipped !== true
+  ));
+  if (!pristine) {
+    return inputError('Start a new practice plan before starting another interview.');
+  }
+  supersedeActiveScoreRequest();
   session.error = null;
   session.current = 0;
   session.phase = 'interviewing';
   return { ok: true, question: session.questions[0] };
 }
 
-export async function submitAnswer(transcript) {
-  throw new Error('not implemented');
+async function requestScore(answer, question, brief, request, signal) {
+  let response;
+  try {
+    response = await request('/api/analyze', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ task: 'score', answer, question, brief }),
+      signal,
+    });
+  } catch {
+    if (signal?.aborted) return { ok: false, code: 'superseded' };
+    return { ok: false, code: 'network_error', error: 'We could not reach the analysis service. Please try again.' };
+  }
+
+  let data;
+  try {
+    data = await response.json();
+  } catch {
+    return { ok: false, status: response.status, code: 'invalid_response', error: 'The analysis service returned an unreadable response. Please try again.' };
+  }
+
+  if (!response.ok) {
+    return {
+      ok: false,
+      status: response.status,
+      code: typeof data?.code === 'string' ? data.code : 'analysis_failed',
+      error: typeof data?.error === 'string' ? data.error : 'Analysis could not be completed. Please try again.',
+    };
+  }
+
+  if (!data || typeof data !== 'object' || Array.isArray(data)
+    || Object.keys(data).some((key) => !['scores', 'missed', 'modelAnswer', 'meta'].includes(key))) {
+    return { ok: false, status: response.status, code: 'invalid_response', error: 'The analysis service returned an unusable result. Please try again.' };
+  }
+  const score = { scores: data.scores, missed: data.missed, modelAnswer: data.modelAnswer };
+  if (validateScoreResponse(score).length) {
+    return { ok: false, status: response.status, code: 'invalid_response', error: 'The analysis service returned an unusable result. Please try again.' };
+  }
+  return { ok: true, score };
+}
+
+/**
+ * Saves and scores the spoken transcript against the immutable question and
+ * brief returned by the accepted brief request. `request` is injectable so
+ * lifecycle races can be tested without a provider call.
+ */
+export async function submitAnswer(transcript, { request = globalThis.fetch } = {}) {
+  if (session.phase !== 'interviewing') {
+    return inputError('Start the interview before submitting an answer.');
+  }
+  const current = session.current;
+  const question = session.questions[current];
+  if (!question || !session.brief) {
+    return inputError('The current interview question is unavailable. Start the interview again.');
+  }
+  const answer = normalizeText(transcript);
+  if (!answer) return inputError(copy.err.empty_answer);
+  if (answer.length > MAX_ANSWER_CHARS) return inputError(copy.err.answer_long);
+  if (session.scoring) {
+    return { ok: false, code: 'scoring_in_progress', error: copy.busy.scoring };
+  }
+
+  // The answer belongs in the page even if scoring fails. Use narrow saved
+  // context rather than the mutable session object, which may change while
+  // the request is in flight.
+  question.answer = answer;
+  question.skipped = false;
+  // Re-scoring (including a direct-bound edit) replaces the transcript before
+  // its request can settle. Clear every artifact now, rather than leaving a
+  // former score/model answer visible if the replacement request fails.
+  question.scores = null;
+  question.missed = [];
+  delete question.modelAnswer;
+  session.error = null;
+  session.scoreFailed = false;
+  session.scoring = true;
+  const scoreQuestion = {
+    id: question.id,
+    prompt: question.prompt,
+    sourceQuote: question.sourceQuote,
+    targetsGap: question.targetsGap,
+  };
+  const scoreBrief = cloneBrief(session.brief);
+  const { generation, controller } = beginScoreRequest();
+  const result = await requestScore(answer, scoreQuestion, scoreBrief, request, controller.signal);
+
+  // Abort alone is insufficient: test doubles and already-returning browser
+  // requests can ignore it. Also reject a direct-bound answer edit or
+  // navigation while the original request was pending.
+  if (!isCurrentScoreRequest(generation)
+    || session.phase !== 'interviewing'
+    || session.current !== current
+    || session.questions[current] !== question
+    || question.answer !== answer) {
+    finishScoreRequest(generation, controller);
+    return { ok: false, code: 'superseded' };
+  }
+  if (!result.ok) {
+    session.error = result.error ?? null;
+    session.scoreFailed = result.code !== 'superseded';
+    finishScoreRequest(generation, controller);
+    return result;
+  }
+
+  question.scores = { ...result.score.scores };
+  question.missed = [...result.score.missed];
+  question.modelAnswer = result.score.modelAnswer;
+  session.scoreFailed = false;
+  session.error = null;
+  if (current < session.questions.length - 1) {
+    session.current = current + 1;
+    finishScoreRequest(generation, controller);
+    return { ok: true, question: session.questions[session.current] };
+  }
+
+  session.phase = 'done';
+  const verdict = getVerdict();
+  finishScoreRequest(generation, controller);
+  return { ok: true, verdict };
 }
 
 export function getVerdict() {
-  throw new Error('not implemented');
+  // Ignore hand-mutated or corrupt residue. Only a complete stored answer
+  // with a validator-approved score contributes to the average or coverage.
+  const scores = session.questions
+    .filter((question) => typeof question?.answer === 'string'
+      && question.answer.trim().length > 0
+      && question.skipped !== true
+      && validateScoreResponse({
+        scores: question.scores,
+        missed: question.missed,
+        modelAnswer: question.modelAnswer,
+      }).length === 0)
+    .map((question) => ({ scores: question.scores }));
+  return buildVerdict(scores);
+}
+
+function storageForBrowser() {
+  if (typeof window === 'undefined') return null;
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+function persistentSnapshot() {
+  // The required privacy copy promises that a CV is never saved. A
+  // resume-backed plan also carries CV-derived fit/gap material, so preserve
+  // progress only for no-CV sessions instead of retaining either the source
+  // text or a derived CV profile locally.
+  if (session.resume !== null
+    || session.fitMatch !== null
+    || session.questions.some((question) => question.targetsGap === true)) return null;
+  return {
+    posting: session.posting,
+    brief: session.brief ? cloneBrief(session.brief) : null,
+    fitMatch: cloneFitMatch(session.fitMatch),
+    questions: cloneQuestions(session.questions).map((question) => ({
+      id: question.id,
+      prompt: question.prompt,
+      sourceQuote: question.sourceQuote,
+      targetsGap: question.targetsGap,
+      answer: question.answer ?? null,
+      scores: question.scores ? { ...question.scores } : null,
+      missed: [...(question.missed ?? [])],
+      ...(typeof question.modelAnswer === 'string' ? { modelAnswer: question.modelAnswer } : {}),
+      ...(question.skipped === true ? { skipped: true } : {}),
+    })),
+    current: session.current,
+    phase: session.phase,
+  };
+}
+
+function validPersistedSession(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)
+    || Object.keys(value).length !== 6
+    || !['posting', 'brief', 'fitMatch', 'questions', 'current', 'phase'].every((key) => Object.hasOwn(value, key))) return false;
+  if (typeof value.posting !== 'string' || validatePosting(value.posting)) return false;
+  if (!['ready', 'interviewing', 'done'].includes(value.phase)
+    || !Number.isInteger(value.current) || value.current < 0 || value.current >= value.questions?.length) return false;
+  const briefData = {
+    brief: value.brief,
+    fitMatch: value.fitMatch,
+    questions: Array.isArray(value.questions) ? value.questions.map((question) => ({
+      id: question?.id,
+      prompt: question?.prompt,
+      sourceQuote: question?.sourceQuote,
+      targetsGap: question?.targetsGap,
+    })) : value.questions,
+  };
+  if (validateBriefResponse(briefData, { posting: value.posting, requireFitMatch: false }).length) return false;
+  return value.questions.every((question) => {
+    if (!question || typeof question !== 'object' || Array.isArray(question)
+      || !Object.keys(question).every((key) => ['id', 'prompt', 'sourceQuote', 'targetsGap', 'answer', 'scores', 'missed', 'modelAnswer', 'skipped'].includes(key))
+      || (question.answer !== null && (typeof question.answer !== 'string' || question.answer.length > MAX_ANSWER_CHARS))
+      || !Array.isArray(question.missed)
+      || (question.skipped !== undefined && typeof question.skipped !== 'boolean')) return false;
+    if (question.scores === null) return question.modelAnswer === undefined && question.missed.length === 0;
+    if (typeof question.answer !== 'string' || question.answer.trim().length === 0 || question.skipped === true) return false;
+    return validateScoreResponse({ scores: question.scores, missed: question.missed, modelAnswer: question.modelAnswer }).length === 0;
+  });
+}
+
+function removePersistedSession(storage) {
+  try { storage.removeItem(SESSION_STORAGE_KEY); } catch { /* storage is unavailable */ }
+}
+
+/** Writes only a completed, schema-valid session. Storage failures stay local. */
+export function persistSession(storage = storageForBrowser()) {
+  if (!storage) return false;
+  const value = persistentSnapshot();
+  // A prior no-CV snapshot must not survive after the user adds a CV.
+  if (!value || !validPersistedSession(value)) {
+    removePersistedSession(storage);
+    return false;
+  }
+  try {
+    storage.setItem(SESSION_STORAGE_KEY, JSON.stringify({ version: SESSION_STORAGE_VERSION, session: value }));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Restores a versioned, schema-valid session; corrupt or old values are discarded. */
+export function restoreSession(storage = storageForBrowser()) {
+  if (!storage) return false;
+  let saved;
+  try {
+    const raw = storage.getItem(SESSION_STORAGE_KEY);
+    if (!raw) return false;
+    saved = JSON.parse(raw);
+  } catch {
+    removePersistedSession(storage);
+    return false;
+  }
+  if (!saved || typeof saved !== 'object' || Array.isArray(saved)
+    || Object.keys(saved).length !== 2
+    || saved.version !== SESSION_STORAGE_VERSION
+    || !Object.hasOwn(saved, 'session')
+    || !validPersistedSession(saved.session)) {
+    removePersistedSession(storage);
+    return false;
+  }
+
+  supersedeActiveBriefRequest();
+  supersedeActiveScoreRequest();
+  applyBriefProjection({ ...saved.session, resume: null, isExample: false, scoreFailed: false });
+  session.error = null;
+  session.agentSeen = false;
+  session.lastCallAt = null;
+  session.serviceDown = false;
+  session.scoring = false;
+  lastAcceptedBriefProjection = {
+    ...captureBriefProjection(),
+    // Accepted brief projections are always ready; progress belongs to the
+    // live restored session and remains available to resume.
+    phase: 'ready',
+  };
+  initialBriefProjection = null;
+  return true;
+}
+
+// Module evaluation happens during SSR too. Browser-only storage and effects
+// stay behind this guard so Netlify can import the state module safely.
+if (typeof window !== 'undefined') {
+  restoreSession();
+  $effect.root(() => {
+    $effect(() => {
+      JSON.stringify(session);
+      persistSession();
+    });
+  });
 }
