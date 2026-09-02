@@ -912,3 +912,205 @@ test('T30 restores only versioned valid state and safely discards corrupt or sta
   assert.equal(legacy.getItem(SESSION_STORAGE_KEY), null);
   assert.deepEqual(legacy.removed, [SESSION_STORAGE_KEY]);
 });
+
+test('T32 P2-3: startInterview exempts only the worked example from the pristine guard', async (t) => {
+  const vite = await createServer({
+    configFile: new URL('../vite.test.config.js', import.meta.url).pathname,
+    server: { middlewareMode: true, hmr: false, ws: false }, appType: 'custom',
+  });
+  t.after(() => vite.close());
+  const { session, setPosting, startInterview, submitAnswer } = await vite.ssrLoadModule('/src/lib/session.svelte.js');
+  reset(session);
+  await setPosting(posting, { request: async () => response(briefResponse()) });
+  assert.equal(startInterview().ok, true);
+  assert.equal((await submitAnswer('First transcript.', { request: async () => response(scoreResponse(5)) })).ok, true);
+
+  // A real, non-example session with a score in place still refuses a
+  // second start. isExample alone must not weaken the guard.
+  assert.deepEqual(startInterview(), {
+    ok: false, error: 'Start a new practice plan before starting another interview.',
+  });
+
+  // The worked example ships pre-scored (loadExample writes answers and
+  // scores directly, never through submitAnswer), so it can never satisfy
+  // the pristine check. With isExample true, startInterview must still
+  // succeed so a person and an agent see the same screen (Section 10 note
+  // on state 10).
+  session.phase = 'ready';
+  session.isExample = true;
+  const started = startInterview();
+  assert.equal(started.ok, true);
+  assert.equal(started.question.id, session.questions[0].id);
+  assert.equal(session.phase, 'interviewing');
+  assert.equal(session.current, 0);
+});
+
+test('T32 P2-4: a skipped question that already carries a score keeps the session persistable', async (t) => {
+  const vite = await createServer({
+    configFile: new URL('../vite.test.config.js', import.meta.url).pathname,
+    server: { middlewareMode: true, hmr: false, ws: false }, appType: 'custom',
+  });
+  t.after(() => vite.close());
+  const { session, setPosting, persistSession, SESSION_STORAGE_KEY } = await vite.ssrLoadModule('/src/lib/session.svelte.js');
+  reset(session);
+  await setPosting(posting, { request: async () => response(briefResponse()) });
+  Object.assign(session.questions[0], {
+    answer: 'A scored answer.',
+    scores: scoreResponse(4).scores,
+    missed: scoreResponse(4).missed,
+    modelAnswer: scoreResponse(4).modelAnswer,
+  });
+  session.current = 1;
+  session.phase = 'interviewing';
+  const storage = memoryStorage();
+  assert.equal(persistSession(storage), true);
+
+  // Practice.svelte's skip() guard: a question that already carries a score
+  // is not blocked, so Skip must not mark it skipped. The session stays
+  // exactly as persistable as it was.
+  assert.equal(session.questions[0].scores !== null, true);
+  assert.equal(session.questions[0].skipped, undefined);
+  assert.equal(persistSession(storage), true);
+
+  // The shape the review measured: skipped true on a scored question. This
+  // is what the pre-fix skip() produced, and validPersistedSession must
+  // still reject it, which is why the guard in skip() exists.
+  session.questions[0].skipped = true;
+  assert.equal(persistSession(storage), false);
+  assert.equal(storage.getItem(SESSION_STORAGE_KEY), null);
+});
+
+test('T32 P2-5: abandonScoring retires an in-flight score request and clears the busy flag', async (t) => {
+  const vite = await createServer({
+    configFile: new URL('../vite.test.config.js', import.meta.url).pathname,
+    server: { middlewareMode: true, hmr: false, ws: false }, appType: 'custom',
+  });
+  t.after(() => vite.close());
+  const { session, setPosting, startInterview, submitAnswer, abandonScoring } = await vite.ssrLoadModule('/src/lib/session.svelte.js');
+  reset(session);
+  await setPosting(posting, { request: async () => response(briefResponse()) });
+  startInterview();
+
+  const held = deferred();
+  let signal;
+  const inFlight = submitAnswer('Answer while Skip is pressed.', {
+    request: async (url, options) => {
+      signal = options.signal;
+      return held.promise;
+    },
+  });
+  assert.equal(session.scoring, true);
+
+  // This is what Practice.svelte's skip() and finishEarly() now call before
+  // moving off the question, so a stale busy flag cannot survive the move.
+  abandonScoring();
+  assert.equal(session.scoring, false);
+  assert.equal(signal.aborted, true);
+
+  held.resolve(response(scoreResponse(5)));
+  assert.deepEqual(await inFlight, { ok: false, code: 'superseded' });
+  // The abandoned request must not resurrect the busy flag or a stray score.
+  assert.equal(session.scoring, false);
+  assert.equal(session.questions[0].scores, null);
+});
+
+test('T32 R2 P2-1: the example exemption stops at the example plan screen', async (t) => {
+  const vite = await createServer({
+    configFile: new URL('../vite.test.config.js', import.meta.url).pathname,
+    server: { middlewareMode: true, hmr: false, ws: false }, appType: 'custom',
+  });
+  t.after(() => vite.close());
+  const { session, startInterview, submitAnswer } = await vite.ssrLoadModule('/src/lib/session.svelte.js');
+  const { loadExample } = await vite.ssrLoadModule('/src/lib/fixture.js');
+  reset(session);
+
+  // The See the example path: a ready, pre-scored plan that is never
+  // pristine. This is the one screen the exemption still covers.
+  loadExample();
+  session.isExample = true;
+  assert.equal(session.phase, 'ready');
+  assert.equal(startInterview().ok, true);
+
+  // The person now answers for real inside the example session. Nothing
+  // clears the flag on this path, and the answers are the person's own.
+  assert.equal((await submitAnswer('My own answer, not the fixture text.', {
+    request: async () => response(scoreResponse(4)),
+  })).ok, true);
+  assert.equal(session.phase, 'interviewing');
+  assert.equal(session.current, 1);
+  assert.equal(session.isExample, true);
+
+  // A restart must be refused whatever the flag says, with the position
+  // and the phase left untouched.
+  assert.deepEqual(startInterview(), {
+    ok: false, error: 'Start a new practice plan before starting another interview.',
+  });
+  assert.equal(session.current, 1);
+  assert.equal(session.phase, 'interviewing');
+
+  // The tips screen is refused too, so the agent cannot wipe it either.
+  session.phase = 'done';
+  assert.deepEqual(startInterview(), {
+    ok: false, error: 'Start a new practice plan before starting another interview.',
+  });
+  assert.equal(session.phase, 'done');
+  assert.equal(session.current, 1);
+});
+
+test('T32 R2 P3-1: a rolled-back plan starts for both callers at the same question', async (t) => {
+  const previousDocument = globalThis.document;
+  const registered = [];
+  globalThis.document = {
+    modelContext: {
+      registerTool(definition, options) { registered.push({ definition, options }); },
+    },
+  };
+  t.after(() => { globalThis.document = previousDocument; });
+
+  const vite = await createServer({
+    configFile: new URL('../vite.test.config.js', import.meta.url).pathname,
+    server: { middlewareMode: true, hmr: false, ws: false }, appType: 'custom',
+  });
+  t.after(() => vite.close());
+  const { session, setPosting, setResume, startInterview, submitAnswer } = await vite.ssrLoadModule('/src/lib/session.svelte.js');
+  const { registerTools } = await vite.ssrLoadModule('/src/lib/webmcp.js');
+  const teardown = registerTools();
+  t.after(() => teardown());
+
+  // The round-2 reproduction: a scored interview whose CV request fails and
+  // rolls the phase back to the plan screen, answer and score intact.
+  async function rolledBackPlan() {
+    reset(session);
+    await setPosting(posting, { request: async () => response(briefResponse()) });
+    startInterview();
+    await submitAnswer('First transcript.', { request: async () => response(scoreResponse(4)) });
+    const rolledBack = await setResume('Jane Candidate, API writer.', {
+      request: async () => response({ error: 'No provider available.', code: 'provider_unavailable' }, 503),
+    });
+    assert.equal(rolledBack.ok, false);
+    assert.equal(session.phase, 'ready');
+    assert.equal(session.current, 1);
+    assert.equal(session.isExample, false);
+    assert.equal(session.questions[0].scores !== null, true);
+  }
+
+  // The person's path: Plan.svelte's startPractice is now only this call.
+  // It resumes at Question 2 with the earlier score intact.
+  await rolledBackPlan();
+  const humanStart = startInterview();
+  assert.equal(humanStart.ok, true);
+  assert.equal(humanStart.question.id, 'q2');
+  assert.equal(session.current, 1);
+  assert.equal(session.phase, 'interviewing');
+  assert.equal(session.questions[0].scores.specificity, 4);
+
+  // The agent's path on the same on-screen state: the registered
+  // start_interview tool returns the same question JSON.
+  await rolledBackPlan();
+  const startTool = registered.find((entry) => entry.definition.name === 'start_interview');
+  const agentStart = await startTool.definition.execute({});
+  assert.equal(session.agentSeen, true);
+  assert.equal(session.current, 1);
+  assert.equal(session.phase, 'interviewing');
+  assert.deepEqual(JSON.parse(agentStart.content[0].text), humanStart.question);
+});

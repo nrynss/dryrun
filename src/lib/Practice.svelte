@@ -16,7 +16,7 @@
   import { copy } from './copy.js';
   import { TOTAL_QUESTIONS } from './shapes.js';
   import { hasModelContext } from './webmcp.js';
-  import { MAX_ANSWER_CHARS, session } from './session.svelte.js';
+  import { MAX_ANSWER_CHARS, session, submitAnswer, abandonScoring } from './session.svelte.js';
 
   let question = $derived(session.questions[session.current]);
   let connected = $derived(hasModelContext());
@@ -49,9 +49,9 @@
   // Section 10 state 12: the scoring-failed strip clears when the answer
   // text changes — the failure described the text as submitted, and any edit
   // means the person is trying again (the answer stays until then, R1).
-  // failedAnswer latches the text the failure applied to; the flag itself is
-  // set externally (console, then T28), so the effect must not react to the
-  // flag alone or it would clear the strip the moment it appeared.
+  // failedAnswer latches the text the failure applied to. submitAnswer sets
+  // the flag itself, so the effect watches the answer text rather than the
+  // flag. Otherwise it would clear the strip the instant it appears.
   let failedAnswer = $state(null);
   $effect(() => {
     if (session.scoreFailed) {
@@ -65,35 +65,61 @@
     }
   });
 
-  function next() {
-    // State 20: a score call in flight — the primary is busy and nothing
-    // advances until it settles (the real score call, T28, drives this).
+  // T32: go through the real capability. submitAnswer checks for an empty or
+  // over-long answer before it touches the network, so a blocked answer
+  // costs nothing. It then scores the transcript, stores the result on this
+  // question, and advances the index or moves to 'done'. That is exactly
+  // what an agent's submit_answer tool call does, and re-implementing it
+  // here would be the drift the parity rule forbids.
+  async function next() {
+    // State 20: a score call in flight. The primary is busy and nothing
+    // advances until it settles.
     if (session.scoring) return;
     const answer = question?.answer ?? '';
-    if (!answer.trim()) {
-      blocked = 'empty'; // nothing advances, the answer is not lost
+    // Section 10 state 12 does not block. The score already failed for this
+    // exact text, so a second press means the person is choosing to move on.
+    if (session.scoreFailed && failedAnswer === answer) {
+      blocked = null;
+      advance();
       return;
     }
-    if (answer.length > MAX_ANSWER_CHARS) {
-      blocked = 'long';
+    const result = await submitAnswer(answer);
+    if (!result.ok) {
+      // Section 10 states 13/14: submitAnswer's own validation returns the
+      // exact copy string, so match on it rather than re-deriving the
+      // reason locally. Any other failure (service down, a superseded
+      // request) surfaces through session.scoreFailed instead (state 12).
+      if (result.error === copy.err.empty_answer) blocked = 'empty';
+      else if (result.error === copy.err.answer_long) blocked = 'long';
       return;
     }
     blocked = null;
-    advance();
   }
 
-  // Skip never checks the box: it is the way past a blocked Next. skipped is
-  // an additive field on the question, like modelAnswer — T25-T30 formalize
-  // it into the session contract. Skipped questions stay skipped (no
-  // back-navigation).
+  // Skip never checks the box: it is the way past a blocked Next. No shared
+  // capability skips a question. An agent always answers and never taps
+  // Skip. So this stays a local, human-only transition. skipped is an
+  // additive field on the question, like modelAnswer. Skipped questions stay
+  // skipped (no back-navigation).
   function skip() {
     blocked = null;
-    session.questions[session.current].skipped = true;
+    // A score call for this question may still be in flight. Retire it here
+    // so session.scoring cannot outlive the question it describes.
+    abandonScoring();
+    const question = session.questions[session.current];
+    // A question that already carries a score is not blocked, so it cannot be
+    // the reason Skip was pressed. Marking it skipped would contradict the
+    // stored score and make the session unsavable (T30's persisted-question
+    // rule), so only an unscored question gets the flag.
+    if (!question.scores) question.skipped = true;
     advance();
   }
 
   // 9.4: Finish and show my tips appears from question 3 onward.
   function finishEarly() {
+    // A score call for the current question may still be in flight. Retire
+    // it here so session.scoring cannot outlive the question it describes.
+    abandonScoring();
     session.phase = 'done';
   }
 
@@ -181,10 +207,10 @@
         <MessageStrip kind="stop" role="alert" message={copy.err.answer_long} />
       {/if}
       <!-- On question 8 the primary becomes Show my tips (9.4). -->
-      <!-- Section 10 state 20: while a score call is in flight the primary
-           shows its busy state — aria-busy, 20px spinner, busy label, width
-           unchanged (8.2). The real score call (T28) drives session.scoring;
-           the flag is console-reachable. -->
+      <!-- Section 10 state 20: while a score call is in flight, the primary
+           shows its busy state: aria-busy, 20px spinner, busy label, width
+           unchanged (8.2). submitAnswer drives session.scoring directly, for
+           a human press and for an agent's submit_answer call alike. -->
       <Button busy={session.scoring} busyLabel={copy.busy.scoring} onclick={next}>
         {session.current === TOTAL_QUESTIONS - 1 ? copy.btn.tips : copy.btn.next}
       </Button>

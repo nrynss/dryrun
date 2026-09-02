@@ -1,5 +1,6 @@
 node_modules/
 dist/
 .netlify/
+.claude/
 .env
 .DS_Store

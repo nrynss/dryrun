@@ -9,35 +9,35 @@
   import ResultPanel from './ResultPanel.svelte';
   import ScoreRow from './ScoreRow.svelte';
   import { copy } from './copy.js';
-  import { AXES, buildVerdict } from './shapes.js';
-  import { session } from './session.svelte.js';
+  import { AXES } from './shapes.js';
+  import { session, getVerdict } from './session.svelte.js';
 
-  // buildVerdict reads AnswerScore-shaped objects ({ scores }); the session
-  // question carries the same scores object, so wrap it.
-  let scored = $derived(
-    session.questions.filter((q) => q.scores).map((q) => ({ scores: q.scores })),
-  );
-  let verdict = $derived(buildVerdict(scored));
+  // T32: the top-level verdict comes from the same capability an agent's
+  // get_verdict tool call returns. A human never reads a different band,
+  // average or coverage than ChatGPT would report for this session.
+  let verdict = $derived(getVerdict());
   // Section 10 state 22: zero scored answers — no result panel, the empty
   // block instead. Reachable by skipping every question.
-  let anyScored = $derived(scored.length > 0);
+  let anyScored = $derived(verdict.answered > 0);
 
-  // Per-axis session averages over the scored questions, keyed by AXES value.
+  // Per-axis session averages, over the same complete, validator-approved
+  // answers getVerdict() itself counts (unscored, skipped, or malformed
+  // residue must not shift these numbers either).
   let axes = $derived(
     Object.fromEntries(
       AXES.map((axis) => {
-        const values = scored
-          .map((s) => s.scores[axis])
-          .filter((n) => typeof n === 'number');
+        const values = session.questions
+          .filter((q) => q.skipped !== true && q.scores && typeof q.scores[axis] === 'number')
+          .map((q) => q.scores[axis]);
         return [axis, values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0];
       }),
     ),
   );
 
   function tryAgain() {
-    // Re-answer the same questions. T25-T30 define the real semantics of a
-    // fresh attempt; for now this re-enters the practice screen with the
-    // existing answers and scores in place.
+    // Re-enters the practice screen with the existing answers and scores in
+    // place, at question 1. This skips startInterview, so it works even
+    // though that capability's pristine guard would refuse a scored plan.
     session.current = 0;
     session.phase = 'interviewing';
   }

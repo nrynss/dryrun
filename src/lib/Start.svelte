@@ -12,7 +12,7 @@
   import MessageStrip from './MessageStrip.svelte';
   import { copy } from './copy.js';
   import { hasModelContext } from './webmcp.js';
-  import { session, MAX_POSTING_CHARS } from './session.svelte.js';
+  import { session, MAX_POSTING_CHARS, MAX_RESUME_CHARS, setPosting } from './session.svelte.js';
   import { loadExample } from './fixture.js';
 
   // 3.6: the near-limit band is 19,000 to 20,000 characters.
@@ -21,6 +21,13 @@
   // The single start choice toggles its own panel; it starts expanded.
   let expanded = $state(true);
   let pasteCv = $state(false);
+  // Section 10 state 7 on the paste route. FileChooser warns while the file
+  // is read. Warn while the CV is pasted, for the same reason. A flag set
+  // on the way out is never seen, because setPosting leaves this screen in
+  // the same flush.
+  let cvWarning = $derived(
+    (session.resume ?? '').length > MAX_RESUME_CHARS ? copy.warn.cv_long : null,
+  );
 
   let sub = $derived(hasModelContext() ? copy.app.sub : copy.app.sub_typing);
   let postingLen = $derived((session.posting ?? '').trim().length);
@@ -30,19 +37,24 @@
   let canStart = $derived(!empty && !overLimit);
 
   function startPractice() {
-    // Function-down path: render example.json. T25/T32 replace this with the
-    // real analyze call. A fresh start is never the worked example, so the
-    // flag is cleared here as well as in differentJob (state 11).
+    // T32: the real write path. A fresh start is never the worked example.
     session.isExample = false;
-    loadExample();
+    // Section 10 state 7 never blocks the whole product (the note under the
+    // table). cvWarning above is derived, so the strip already shows while
+    // the person is on this screen. Truncate here so the request stays
+    // inside the server's limit.
+    if ((session.resume ?? '').length > MAX_RESUME_CHARS) {
+      session.resume = session.resume.slice(0, MAX_RESUME_CHARS);
+    }
+    // setPosting stores the posting and CV, calls the analyse function, and
+    // moves the phase itself. App.svelte renders Getting ready meanwhile.
+    setPosting(session.posting);
   }
 
   // Section 10 state 10/11: the demo insurance. When the service is down the
-  // example button must be prominent, not hidden — it loads example.json
-  // like a normal start but marks the session as the worked example, so the
-  // plan screen shows notice.example. fixture.js is frozen for T19, so the
-  // loadExample({ asExample }) option of the state audit is honoured here at
-  // the call site instead; T25-T32 may move it into the loader.
+  // example button must be prominent, not hidden. It loads example.json and
+  // marks the session as the worked example, so the plan screen shows
+  // notice.example. This is the only caller of loadExample.
   function seeExample() {
     loadExample();
     session.isExample = true;
@@ -102,6 +114,9 @@
           </Button>
           {#if pasteCv}
             <TextArea label={copy.start.cv_paste_label} bind:value={session.resume} />
+          {/if}
+          {#if cvWarning}
+            <MessageStrip kind="almost" role="status" message={cvWarning} />
           {/if}
         </div>
       </div>
@@ -250,6 +265,9 @@
     margin-top: 16px;
   }
   .cv :global(.field) {
+    margin-top: 12px;
+  }
+  .cv :global(.strip) {
     margin-top: 12px;
   }
 

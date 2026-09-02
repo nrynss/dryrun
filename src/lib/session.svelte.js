@@ -23,23 +23,22 @@ export const session = $state({
   error: null,
   /** True once an agent has called any tool. Drives the status strip. */
   agentSeen: false,
-  /** @type {number|null} Millis of the most recent tool call. Drives the ChatGPT-line flash (design 3.3). T25-T30 formalize. */
+  /** @type {number|null} Millis of the most recent tool call. Drives the ChatGPT-line flash (design 3.3). */
   lastCallAt: null,
   /** Interface-block flag (Section 10 state 10): set when the brief call
    *  fails after retries. The Start screen shows err.service_down and the
-   *  example button. T25-T32 set it from the real call path. */
+   *  example button. */
   serviceDown: false,
   /** True while the worked example is on screen (Section 10 state 11):
-   *  the plan screen shows notice.example. T25-T32 wire the real analyze
-   *  call; isExample is how the interface knows to show the notice. */
+   *  the plan screen shows notice.example. No tool ever sets this. */
   isExample: false,
   /** Section 10 state 12: set when the score call fails after retries. The
-   *  practice screen shows err.score_failed under the answer box; the
+   *  practice screen shows err.score_failed under the answer box. The
    *  answer stays (R1). */
   scoreFailed: false,
   /** Section 10 state 20: true while a score call is in flight. The practice
-   *  primary button shows its busy state. The real score call (T28) drives
-   *  this; the block flag is console-reachable. */
+   *  primary button shows its busy state. submitAnswer drives this directly,
+   *  for a human press and for an agent's submit_answer call alike. */
   scoring: false,
 });
 
@@ -71,8 +70,8 @@ export const SESSION_STORAGE_KEY = 'dry-run.session.v1';
 export const SESSION_STORAGE_VERSION = 2;
 
 // Keep the accepted resume/brief/questions set outside the reactive draft.
-// The Start screen will bind its CV field directly to session.resume in T32;
-// by the time setResume runs, that draft may already contain a replacement CV.
+// The Start screen binds its CV field directly to session.resume, so by the
+// time setResume runs, that draft may already contain a replacement CV.
 // This is therefore the only reliable rollback target for a failed CV update.
 let lastAcceptedBriefProjection = null;
 
@@ -255,6 +254,17 @@ function supersedeActiveScoreRequest() {
   activeScoreController = null;
   ++scoreRequestGeneration;
   session.scoring = false;
+}
+
+/**
+ * Retires any score request in flight for the current question. A human
+ * control that leaves the question before scoring settles (Skip, Finish
+ * early) must call this so session.scoring cannot outlive the question it
+ * describes. An agent never leaves a question mid-score, so this has no
+ * tool equivalent.
+ */
+export function abandonScoring() {
+  supersedeActiveScoreRequest();
 }
 
 function isCurrentScoreRequest(generation) {
@@ -479,14 +489,26 @@ export function startInterview() {
     && question.modelAnswer === undefined
     && question.skipped !== true
   ));
-  if (!pristine) {
+  // The worked example ships pre-scored, so it can never be pristine. Exempt
+  // it on its own plan screen only. Once the example interview starts it
+  // carries real answers and real scores. It must not be restartable
+  // (Section 10 note on state 10).
+  const examplePlan = session.isExample && session.phase === 'ready';
+  // A failed CV request can roll a plan with answers back to this screen
+  // while its brief stays intact (restoreAfterResumeFailure). Resuming is
+  // not restarting: it keeps session.current, so both callers re-enter at
+  // the same question.
+  const resumable = session.phase === 'ready' && !pristine && !session.isExample;
+  if (!pristine && !examplePlan && !resumable) {
     return inputError('Start a new practice plan before starting another interview.');
   }
   supersedeActiveScoreRequest();
   session.error = null;
-  session.current = 0;
+  // A pristine or example plan starts at question 1. A resumed plan keeps
+  // its place.
+  if (!resumable) session.current = 0;
   session.phase = 'interviewing';
-  return { ok: true, question: session.questions[0] };
+  return { ok: true, question: session.questions[session.current] };
 }
 
 async function requestScore(answer, question, brief, request, signal) {

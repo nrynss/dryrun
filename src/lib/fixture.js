@@ -1,10 +1,12 @@
-// Function-down path stand-in (task.md T16): the start screen's "Start
-// practice" renders src/lib/example.json instead of calling the analyse
-// function, so the whole product works with no server. T25-T30 define the
-// real state contract, and T32 wires the real analyse call in here.
+// Function-down path stand-in (task.md T16). The See the example button
+// renders src/lib/example.json instead of calling the analyse function, so
+// the demo still works with no server. Start.svelte's real Start practice
+// button calls setPosting directly (session.svelte.js) and never reaches
+// this file.
 //
-// The session question shape (session.svelte.js) has no modelAnswer field, so
-// it is attached on the question object here for the tips screen to read.
+// The session question shape (session.svelte.js) has no modelAnswer field,
+// so it is attached on the question object here for the tips screen to
+// read.
 
 import example from './example.json';
 import { session } from './session.svelte.js';

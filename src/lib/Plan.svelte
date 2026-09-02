@@ -8,7 +8,7 @@
   import MessageStrip from './MessageStrip.svelte';
   import QuestionCard from './QuestionCard.svelte';
   import { copy } from './copy.js';
-  import { session } from './session.svelte.js';
+  import { session, startInterview } from './session.svelte.js';
 
   // 8.10: show at most the top 3 gap items, then a quiet Show all.
   const GAP_PREVIEW = 3;
@@ -24,9 +24,10 @@
   let hasMoreGaps = $derived(gaps.length > GAP_PREVIEW);
 
   function startPractice() {
-    // T15 replaces this flip with the real practice screen. Until it lands,
-    // App.svelte renders its eight-question harness for 'interviewing'.
-    session.phase = 'interviewing';
+    // Both callers share this door. startInterview starts a pristine plan,
+    // the worked example, and a rolled-back plan that already carries
+    // answers, so the screen's one primary always works.
+    startInterview();
   }
 </script>
 
