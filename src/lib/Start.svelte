@@ -64,7 +64,6 @@
 
 <div class="page">
   <div class="column start">
-    <p class="t-h2 wordmark">{copy.app.name}</p>
     <h1 class="t-display promise">{copy.app.promise}</h1>
     <p class="t-body sub">{sub}</p>
 
@@ -159,12 +158,7 @@
 
 <style>
   .start {
-    padding-block: 24px 32px; /* 9.1: 24px top padding, 32px to the bottom */
-  }
-
-  .wordmark {
-    color: var(--strong);
-    margin: 0;
+    padding-block: 0 32px; /* 9.1: 24px top padding moved to shell (T37), 32px to the bottom */
   }
 
   .promise {

@@ -1,4 +1,5 @@
 <script>
+  import Brand from './lib/Brand.svelte';
   import GettingReady from './lib/GettingReady.svelte';
   import Plan from './lib/Plan.svelte';
   import Practice from './lib/Practice.svelte';
@@ -14,6 +15,10 @@
     window.scrollTo(0, 0);
   });
 </script>
+
+<header class="shell column">
+  <Brand />
+</header>
 
 {#if session.phase === 'idle'}
   <!-- 1. Start (9.1). -->
@@ -31,5 +36,14 @@
   <!-- 5. Your tips (9.5). -->
   <Tips />
 {/if}
+
+<style>
+  /* T37: 24px screen-top padding maintained in the shell so spacing from
+     design.md 9.1 to 9.5 holds across all screens. Brand mounts once. */
+  .shell {
+    padding-top: 24px;
+  }
+</style>
+
 
 

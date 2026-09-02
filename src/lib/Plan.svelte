@@ -40,13 +40,12 @@
 <div class="page">
   <div class="column plan">
     <!-- Section 10 state 11: the worked-example notice sits at the very top
-         of the screen, above the wordmark. -->
+         of the screen. -->
     {#if session.isExample}
       <div class="example-notice">
         <MessageStrip kind="note" role="status" message={copy.notice.example} />
       </div>
     {/if}
-    <p class="t-h2 wordmark">{copy.app.name}</p>
     <h1 class="t-h1 title">{copy.plan.title}</h1>
     <p class="t-body sub">{copy.plan.sub}</p>
 
@@ -115,21 +114,15 @@
 </div>
 
 <style>
-  /* 9.3: 24px top padding; 7.2: 32px bottom before the action bar. */
+  /* 9.3: 24px top padding moved to shell (T37); 7.2: 32px bottom before the action bar. */
   .plan {
-    padding-block: 24px 32px;
+    padding-block: 0 32px;
   }
 
-  /* Wordmark, matching the Start screen treatment (9.1). */
-  .wordmark {
-    color: var(--strong);
-    margin: 0;
-  }
-
-  /* One h1 per screen (13). 12px to the sub-line. */
+  /* One h1 per screen (13). 16px to Brand, 12px to the sub-line. */
   .title {
     color: var(--ink);
-    margin: 12px 0 0 0;
+    margin: 16px 0 0 0;
   }
 
   .sub {
@@ -141,6 +134,7 @@
     margin-top: 12px;
   }
   .example-notice {
+    margin-top: 16px;
     margin-bottom: 12px;
   }
 

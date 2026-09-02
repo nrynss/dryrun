@@ -53,7 +53,30 @@
 </script>
 
 <div class="result-panel panel-{bandClass}">
-  <h2 class="t-display title">{title}</h2>
+  <div class="title-row">
+    <h2 class="t-display title">{title}</h2>
+    <!-- T37: small static path-to-point accent beside the title.
+         Purely decorative (aria-hidden="true"). -->
+    <svg
+      class="accent-mark"
+      viewBox="0 0 28 28"
+      width="22"
+      height="22"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        class="accent-path"
+        d="M 4 20 C 8 20, 14 17, 18 9"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+      <circle class="accent-point" cx="22" cy="6" r="2" fill="currentColor" />
+    </svg>
+  </div>
   <p class="t-body line">{line}</p>
   {#if kind}
     <p class="t-body line">{copy.result.capped_kind}</p>
@@ -89,14 +112,49 @@
   .panel-almost { background: var(--almost-wash); }
   .panel-note { background: var(--note-wash); }
 
+  .title-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .accent-mark {
+    width: 22px;
+    height: 22px;
+    flex: none;
+    display: block;
+  }
+
+  .accent-path {
+    stroke-dashoffset: 0;
+  }
+
+  .accent-point {
+    opacity: 1;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .accent-path {
+      stroke-dashoffset: 0;
+      animation: none;
+    }
+    .accent-point {
+      opacity: 1;
+      animation: none;
+    }
+  }
+
   /* 8.11: title t-display in the band colour (text-wrap balance lives on
      the t-display class). */
   .title {
     margin: 0;
   }
-  .panel-strong .title { color: var(--strong); }
-  .panel-almost .title { color: var(--almost); }
-  .panel-note .title { color: var(--note); }
+  .panel-strong .title,
+  .panel-strong .accent-mark { color: var(--strong); }
+  .panel-almost .title,
+  .panel-almost .accent-mark { color: var(--almost); }
+  .panel-note .title,
+  .panel-note .accent-mark { color: var(--note); }
   /* Below 260px the t-display title (text-wrap: balance) cannot wrap and
      overflows its content box; allow word breaks. */
   @media (max-width: 260px) {

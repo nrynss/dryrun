@@ -52,7 +52,30 @@
 </script>
 
 <div class="note note-{band}" in:fadeRise>
-  <h2 class="t-h2 title">{title}</h2>
+  <div class="title-row">
+    <h2 class="t-h2 title">{title}</h2>
+    <!-- T37: small static path accent beside the title. Fades in with note.
+         Purely decorative (aria-hidden="true"). -->
+    <svg
+      class="accent-mark"
+      viewBox="0 0 28 28"
+      width="18"
+      height="18"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        class="accent-path"
+        d="M 4 20 C 8 20, 14 17, 18 9"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+      <circle class="accent-point" cx="22" cy="6" r="2" fill="currentColor" />
+    </svg>
+  </div>
   <p class="t-body line">{oneThing}</p>
 
   <!-- 8.8 item 3: the disclosure, summary t-micro at 44px (13). Inside, the
@@ -87,18 +110,54 @@
     background: var(--note-wash);
     border-left-color: var(--note);
   }
-  .note-good .title {
+  .note-good .title,
+  .note-good .accent-mark {
     color: var(--strong);
   }
-  .note-mid .title {
+  .note-mid .title,
+  .note-mid .accent-mark {
     color: var(--almost);
   }
-  .note-bad .title {
+  .note-bad .title,
+  .note-bad .accent-mark {
     color: var(--note);
   }
 
+  .title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
   .title {
-    margin: 0 0 8px 0;
+    margin: 0;
+  }
+
+  .accent-mark {
+    width: 18px;
+    height: 18px;
+    flex: none;
+    display: block;
+  }
+
+  .accent-path {
+    stroke-dashoffset: 0;
+  }
+
+  .accent-point {
+    opacity: 1;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .accent-path {
+      stroke-dashoffset: 0;
+      animation: none;
+    }
+    .accent-point {
+      opacity: 1;
+      animation: none;
+    }
   }
   .line {
     color: var(--ink);

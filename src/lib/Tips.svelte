@@ -61,7 +61,6 @@
 
 <div class="page">
   <div class="column tips">
-    <p class="t-h2 wordmark">{copy.app.name}</p>
     <h1 class="t-h1 title">{copy.tips.title}</h1>
 
     <!-- 9.5 item 3 / Section 10 state 22: with at least one scored answer
@@ -151,21 +150,15 @@
 </div>
 
 <style>
-  /* 9.5: 24px top padding; 7.2: 32px bottom before the action bar. */
+  /* 9.5: 24px top padding moved to shell (T37); 7.2: 32px bottom before the action bar. */
   .tips {
-    padding-block: 24px 32px;
+    padding-block: 0 32px;
   }
 
-  /* Wordmark, matching the other screens (9.1/9.3). */
-  .wordmark {
-    color: var(--strong);
-    margin: 0;
-  }
-
-  /* One h1 per screen (13). 12px to the first child. */
+  /* One h1 per screen (13). 16px to Brand. */
   .title {
     color: var(--ink);
-    margin: 12px 0 0 0;
+    margin: 16px 0 0 0;
   }
 
   /* 9.5 item 3: the result panel sits 16px below the title. */

@@ -97,7 +97,7 @@ details in the contest flow.
 3. With a resume, it also produces a **fit match**. This lists what you have evidenced and
    what the posting asks for that you have not. It orders them by the size of the gap.
    Roughly a third of the questions then aim at those gaps.
-4. ChatGPT asks the questions out loud. You answer out loud.
+4. ChatGPT asks the questions out loud, or you practise in the app. You answer out loud or by typing.
 5. The page scores each answer as you finish it, against a fixed rubric.
 6. A verdict: band, per-question scores, missed points, model answers.
 
@@ -128,7 +128,7 @@ against eight scoring calls.
 ## WebMCP tools
 
 Tools wrap code the page already has. The page must never tell a human and an agent
-different things. Both callers go through the same functions in `data.js`.
+different things. Both callers go through the same functions in `session.svelte.js`.
 
 | Tool | What it does | Annotations |
 |---|---|---|

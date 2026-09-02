@@ -1,17 +1,14 @@
 <script>
-  // Loading block — dev-diary/design.md 8.14. A 32px spinner, the loading
-  // sentence, and the reassurance sentence, wrapped in role="status" so a
-  // screen reader announces the change. No progress bar and no stage names:
-  // we cannot know the progress, and a fake one is a lie (8.14).
+  // Loading block — dev-diary/design.md 8.14 superseded by T37.
+  // The 48px PathPulse indeterminate activity cue, the loading sentence,
+  // and the reassurance sentence, wrapped in role="status" so a screen reader
+  // announces the change. No progress bar, no timers, and no stage names (8.14, T37).
+  import PathPulse from './PathPulse.svelte';
   import { copy } from './copy.js';
 </script>
 
 <div class="loading" role="status" aria-live="polite">
-  <!-- 8.14: 32px circle, 3px --edge border with a --strong top border,
-       rotating once every 1.2s. Section 12: under reduced motion the arc
-       becomes a plain 32px circle with a 3px --edge-firm border — replaced,
-       never frozen (mirrors Button.svelte). -->
-  <div class="spinner" aria-hidden="true"></div>
+  <PathPulse />
   <p class="t-body text">{copy.busy.brief}</p>
   <p class="t-small sub">{copy.busy.brief_sub}</p>
 </div>
@@ -24,17 +21,7 @@
     padding-block: 48px; /* 8.14: 48px vertical padding, centred */
   }
 
-  .spinner {
-    width: 32px;
-    height: 32px;
-    flex: none;
-    border-radius: 999px;
-    border: 3px solid var(--edge);
-    border-top-color: var(--strong);
-    animation: spin 1.2s linear infinite; /* one turn every 1.2s */
-  }
-
-  /* 8.14: 16px below the spinner, t-body --ink. */
+  /* 8.14: 16px below the cue, t-body --ink. */
   .text {
     color: var(--ink);
     margin: 16px 0 0 0;
@@ -46,19 +33,5 @@
     color: var(--ink-quiet);
     margin: 8px 0 0 0;
     text-align: center;
-  }
-
-  /* Section 12: reduced motion replaces the arc, it does not freeze it. */
-  @media (prefers-reduced-motion: reduce) {
-    .spinner {
-      border-color: var(--edge-firm);
-      animation: none;
-    }
-  }
-
-  @keyframes spin {
-    to {
-      transform: rotate(360deg);
-    }
   }
 </style>

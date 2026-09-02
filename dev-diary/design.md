@@ -624,6 +624,12 @@ A 10px round dot on the left. Dot colour: `--edge-firm` when there is no
 ChatGPT, `--strong` when a call has arrived. The dot is decorative,
 `aria-hidden="true"`.
 
+When an external update arrives (`session.lastCallAt`), a tiny decorative
+open-path cue (16x16) draws once from left to right in the line, alongside and
+not instead of the live status words. Purely decorative (`aria-hidden="true"`,
+`focusable="false"`). Under `prefers-reduced-motion: reduce`, it renders
+instantaneously with static `stroke-dashoffset: 0` and full point opacity.
+
 The text sits in `<p role="status" aria-live="polite">` so a screen reader
 announces the change when ChatGPT updates the page.
 
@@ -775,13 +781,18 @@ and receives focus when it appears.
 
 Centred in the content column. 48px vertical padding.
 
-- A 32px circle, 3px border, `--edge`, with a `--strong` top border, rotating
-  once every 1.2s.
+- A 48px indeterminate activity cue (`PathPulse.svelte`) made from the same
+  curved line and calm point as Brand. A small dot travels along the path and
+  settles back at the beginning while work is pending. Purely decorative
+  (`aria-hidden="true"`, `focusable="false"`).
 - Below it, 16px gap, `t-body` `--ink`, the loading sentence.
 - Below that, 8px gap, `t-small` `--ink-quiet`, the reassurance sentence.
 - Wrapped in `<div role="status" aria-live="polite">`.
 - No progress bar. We cannot know the progress and a fake one is a lie.
 - No stage names. Those are implementation details and they are banned.
+- Under `prefers-reduced-motion: reduce`, the cue renders as a still path and
+  destination point with the pulse dot at rest (`stroke-dashoffset: 0`, full
+  point opacity, `offset-distance: 0%`, `opacity: 0`).
 
 ---
 
@@ -801,8 +812,12 @@ Five screens. They map to `session.phase` exactly.
 
 **Mobile, 360px.** Single column, in this order.
 
-1. Wordmark `Dry Run`, `t-h2`, `--strong`. 24px top padding.
-2. The promise, `t-display`. 16px gap.
+1. App shell wordmark (`Brand.svelte`): T37 supersedes per-screen wordmarks.
+   The `Brand` component mounts once in the app shell (`src/App.svelte`) above
+   every screen with 24px screen-top padding. Semantic text `Dry` (Lexend 500)
+   and `Run` (Lexend 600) beside the decorative Open Path SVG mark
+   (`currentColor`, 28x28, `aria-hidden="true"`).
+2. The promise, `t-display`. 16px gap below the shell mark.
 3. The sub-line, `t-body`, `--ink-quiet`. 12px gap.
 4. The three-step strip. 24px gap. Three rows, each with a 28px circle holding
    the number in `t-micro` `--on-fill` on `--strong`, and the step name in
@@ -839,13 +854,14 @@ disabled and the sentence above it reads `Paste the job advert to start.`
 
 ### 9.2 Getting ready
 
-The loading block per 8.14, centred, with the wordmark above it. No other
-content. No cancel button, because the call is bounded at two attempts with a
-10-second timeout. If it fails, the screen becomes Start with a message strip.
+The loading block per 8.14 (with `PathPulse` indeterminate cue), centred, with
+the shell wordmark above it. No other content. No cancel button, because the
+call is bounded at two attempts with a 10-second timeout. If it fails, the
+screen becomes Start with a message strip.
 
 ### 9.3 Your practice
 
-1. Wordmark. 24px top padding.
+1. The app shell wordmark sits above the screen. Top padding belongs to the shell.
 2. `t-h1` title.
 3. `t-body` sub-line naming the number of questions.
 4. Section `What this job is really about`, a list block from `brief.owns`.
@@ -891,7 +907,7 @@ screen, where the coverage line explains the result honestly.
 
 ### 9.5 Your tips
 
-1. Wordmark. 24px top padding.
+1. The app shell wordmark sits above the screen. Top padding belongs to the shell.
 2. `t-h1` `Your tips for next time`.
 3. Result panel per 8.11. 16px gap.
 4. 32px gap. Then one block per question, 16px gap between blocks.
@@ -995,6 +1011,10 @@ Placeholders in braces are substituted at render time.
 
 Use `app.sub` when `document.modelContext` exists. Use `app.sub_typing`
 otherwise. See Section 15.3 for why.
+
+T37 renders `app.name` as real semantic text in `Brand.svelte`. `Dry` uses
+Lexend 500 and `Run` uses Lexend 600 in sentence case with `--strong`. The
+decorative Open Path SVG mark mounts once beside it in the app shell.
 
 ### 11.2 Buttons
 
@@ -1181,16 +1201,17 @@ unavoidable and all three are still short and active.
 
 ## 12. Motion
 
-Motion is minimal and it earns its place in exactly three moments. Everything
-else is instant.
+Motion is minimal and calm: a signal of state change or gentle orientation,
+never a performance or a countdown.
 
 | Moment | Motion | Duration | Reduced motion |
 |---|---|---|---|
-| Question changes | Card content cross-fades | 160ms ease-out | Instant swap |
-| Feedback note appears | Fade in and rise 4px | 200ms ease-out | Instant appear |
-| ChatGPT flash | Row background fades from `--strong-wash` to transparent | 1200ms linear | No fade. Text changes and reverts at 4s |
-| Score bar fills | Width transition | 300ms ease-out | Instant width |
-| Loading spinner | Rotate 360deg | 1.2s linear, infinite | Static circle, text only |
+| App first loads / Shell mount | Open Path draws once, destination point fades in, and point makes 1 slow settle cycle on Start screen | 600ms path draw, 350ms point fade, 2.6s settle | Instant resting state (`stroke-dashoffset: 0`, full opacity) |
+| Questions are being built | `PathPulse` indeterminate cue: small dot travels along curved path and settles back | 2.2s loop | Plain still path and point, pulse dot at rest |
+| Question changes | Card content cross-fades with 4px upward settle | 160ms ease-out | Instant swap |
+| Answer feedback | Feedback note fades in and rises 4px, while static path accent beside title fades with it | 200ms ease-out | Instant appear |
+| ChatGPT page update | Wash flash plus one-time path draw in tiny cue in ChatGPT line | 500ms cue draw, 1200ms bg fade | Instant complete path and point, and text reverts at 4s |
+| Progress and result | Score bar fills, while static path accent settles beside result panel title | 300ms ease-out | Instant width and instant appear |
 | Button press | `translateY(1px)` | 80ms | None |
 
 There is no count-up on any number. Numbers are secondary detail now, and
@@ -1212,9 +1233,12 @@ Global reduced-motion block, required:
 }
 ```
 
-The spinner needs its own handling, because killing the animation leaves a
-frozen arc that looks broken. Under reduced motion, render a plain 32px circle
-with a 3px `--edge-firm` border and no `--strong` arc.
+T37 static component fallbacks: The global `0.01ms` block alone is not
+sufficient for paths and looping pulse dots. Every SVG component provides
+static properties inside its own `@media (prefers-reduced-motion: reduce)`
+block. Components set `stroke-dashoffset: 0`, give destination points full opacity,
+and place pulse dots at rest (`opacity: 0`, `offset-distance: 0%`). Under reduced motion,
+every mark renders complete and `PathPulse` remains a calm still path.
 
 ---
 

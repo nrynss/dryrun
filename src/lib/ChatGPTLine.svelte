@@ -56,6 +56,32 @@
 
 <div class="chatline" class:flash={flashing} class:fading={fading}>
   <span class="dot" class:strong={called} aria-hidden="true"></span>
+  {#if called}
+    {#key session.lastCallAt}
+      <!-- T37: tiny open-path cue draws once when an external page update arrives,
+           supplementary to status words. Purely decorative. -->
+      <svg
+        class="chat-cue"
+        viewBox="0 0 28 28"
+        width="16"
+        height="16"
+        aria-hidden="true"
+        focusable="false"
+      >
+        <path
+          class="cue-path"
+          d="M 4 20 C 8 20, 14 17, 18 9"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          pathLength="100"
+        />
+        <circle class="cue-point" cx="22" cy="6" r="2.5" fill="currentColor" />
+      </svg>
+    {/key}
+  {/if}
   <p class="t-small" role="status" aria-live="polite">{text}</p>
 </div>
 
@@ -94,6 +120,49 @@
   }
   .dot.strong {
     background: var(--strong);
+  }
+
+  .chat-cue {
+    width: 16px;
+    height: 16px;
+    flex: none;
+    display: block;
+    color: var(--strong);
+  }
+
+  .cue-path {
+    stroke-dasharray: 100;
+    stroke-dashoffset: 100;
+    animation: cue-draw 500ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .cue-point {
+    opacity: 0;
+    animation: cue-fade 300ms ease-out 350ms forwards;
+  }
+
+  @keyframes cue-draw {
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+
+  @keyframes cue-fade {
+    to {
+      opacity: 1;
+    }
+  }
+
+  /* T37: reduced-motion static fallback in component styles. */
+  @media (prefers-reduced-motion: reduce) {
+    .cue-path {
+      stroke-dashoffset: 0;
+      animation: none;
+    }
+    .cue-point {
+      opacity: 1;
+      animation: none;
+    }
   }
 
   p {
