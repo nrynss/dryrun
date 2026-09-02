@@ -60,7 +60,7 @@ export const copy = {
     cv_label: 'Add your CV if you have one. Optional.',
     cv_hint: 'You can practise without it.',
     cv_paste_label: 'Paste your CV here.',
-    privacy: 'Your CV stays on your phone or computer. We read the words in it here in your browser. We never save it and there is no account.',
+    privacy: 'Your CV stays in this browser on this device. We read it only to build your questions. Nothing is stored on a server.',
     type_question: 'What kind of job are you applying for?',
     type_warehouse: 'Warehouse',
     type_restaurant: 'Restaurant or cafe',
@@ -93,6 +93,7 @@ export const copy = {
     may_ask: 'Things they may ask you about',
     questions: 'Your 8 questions',
     quote_label: 'From the job advert',
+    remove_cv: 'Remove my CV and start over',
   },
 
   /* 11.5 Practice screen */

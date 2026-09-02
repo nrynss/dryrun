@@ -8,7 +8,7 @@
   import MessageStrip from './MessageStrip.svelte';
   import QuestionCard from './QuestionCard.svelte';
   import { copy } from './copy.js';
-  import { session, startInterview } from './session.svelte.js';
+  import { session, startInterview, startOver } from './session.svelte.js';
 
   // 8.10: show at most the top 3 gap items, then a quiet Show all.
   const GAP_PREVIEW = 3;
@@ -28,6 +28,12 @@
     // the worked example, and a rolled-back plan that already carries
     // answers, so the screen's one primary always works.
     startInterview();
+  }
+
+  function removeCv() {
+    // T35: one exit for the CV and everything derived from it. startOver is
+    // the same capability Tips differentJob uses, so both doors match.
+    startOver();
   }
 </script>
 
@@ -93,9 +99,13 @@
     </div>
   </div>
 
-  <!-- 9.3 item 9: the action bar (7.3). -->
+  <!-- 9.3 item 9: the action bar (7.3). The quiet secondary sits above the
+       primary: one full-width quiet button, 8px gap before the primary. -->
   <div class="actionbar">
     <div class="actionbar-inner">
+      <div class="quiets">
+        <Button variant="quiet" style="width: 100%" onclick={removeCv}>{copy.plan.remove_cv}</Button>
+      </div>
       <Button onclick={startPractice}>{copy.btn.start}</Button>
     </div>
   </div>
@@ -162,5 +172,13 @@
   .actionbar-inner {
     max-width: var(--column);
     margin-inline: auto;
+  }
+
+  /* 7.3: the secondary sits above the primary, stacked with an 8px gap. */
+  .quiets {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 8px;
   }
 </style>

@@ -64,10 +64,11 @@ let scoreRequestGeneration = 0;
 let activeScoreController = null;
 
 export const SESSION_STORAGE_KEY = 'dry-run.session.v1';
-// Version 1 saved the raw CV, which conflicts with the browser-visible
-// privacy promise. Keep the key so existing records can be actively removed,
-// but reject their old envelope and write only the CV-free version 2 shape.
-export const SESSION_STORAGE_VERSION = 2;
+// Version 3 stores the CV text beside the rest of the session so a person
+// never re-uploads it after a reload. The key keeps its v1 name so older
+// records are found and removed rather than left behind. The version check
+// discards every older envelope, including the CV-free version 2 shape.
+export const SESSION_STORAGE_VERSION = 3;
 
 // Keep the accepted resume/brief/questions set outside the reactive draft.
 // The Start screen binds its CV field directly to session.resume, so by the
@@ -681,14 +682,11 @@ function storageForBrowser() {
 }
 
 function persistentSnapshot() {
-  // The required privacy copy promises that a CV is never saved. A
-  // resume-backed plan also carries CV-derived fit/gap material, so preserve
-  // progress only for no-CV sessions instead of retaining either the source
-  // text or a derived CV profile locally.
-  if (session.resume !== null
-    || session.fitMatch !== null
-    || session.questions.some((question) => question.targetsGap === true)) return null;
+  // The snapshot keeps the CV text itself so a CV-backed session survives a
+  // reload. The fit match and the gap-aimed question flags ride along with
+  // it, so the whole derived plan restores.
   return {
+    resume: session.resume,
     posting: session.posting,
     brief: session.brief ? cloneBrief(session.brief) : null,
     fitMatch: cloneFitMatch(session.fitMatch),
@@ -710,8 +708,9 @@ function persistentSnapshot() {
 
 function validPersistedSession(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)
-    || Object.keys(value).length !== 6
-    || !['posting', 'brief', 'fitMatch', 'questions', 'current', 'phase'].every((key) => Object.hasOwn(value, key))) return false;
+    || Object.keys(value).length !== 7
+    || !['resume', 'posting', 'brief', 'fitMatch', 'questions', 'current', 'phase'].every((key) => Object.hasOwn(value, key))) return false;
+  if (value.resume !== null && (typeof value.resume !== 'string' || value.resume.length > MAX_RESUME_CHARS)) return false;
   if (typeof value.posting !== 'string' || validatePosting(value.posting)) return false;
   if (!['ready', 'interviewing', 'done'].includes(value.phase)
     || !Number.isInteger(value.current) || value.current < 0 || value.current >= value.questions?.length) return false;
@@ -725,7 +724,9 @@ function validPersistedSession(value) {
       targetsGap: question?.targetsGap,
     })) : value.questions,
   };
-  if (validateBriefResponse(briefData, { posting: value.posting, requireFitMatch: false }).length) return false;
+  // The stored record answers the same consistency question the brief
+  // boundary asks: gap material is allowed exactly when a resume rode along.
+  if (validateBriefResponse(briefData, { posting: value.posting, requireFitMatch: value.resume !== null }).length) return false;
   return value.questions.every((question) => {
     if (!question || typeof question !== 'object' || Array.isArray(question)
       || !Object.keys(question).every((key) => ['id', 'prompt', 'sourceQuote', 'targetsGap', 'answer', 'scores', 'missed', 'modelAnswer', 'skipped'].includes(key))
@@ -746,8 +747,7 @@ function removePersistedSession(storage) {
 export function persistSession(storage = storageForBrowser()) {
   if (!storage) return false;
   const value = persistentSnapshot();
-  // A prior no-CV snapshot must not survive after the user adds a CV.
-  if (!value || !validPersistedSession(value)) {
+  if (!validPersistedSession(value)) {
     removePersistedSession(storage);
     return false;
   }
@@ -782,7 +782,7 @@ export function restoreSession(storage = storageForBrowser()) {
 
   supersedeActiveBriefRequest();
   supersedeActiveScoreRequest();
-  applyBriefProjection({ ...saved.session, resume: null, isExample: false, scoreFailed: false });
+  applyBriefProjection({ ...saved.session, isExample: false, scoreFailed: false });
   session.error = null;
   session.agentSeen = false;
   session.lastCallAt = null;

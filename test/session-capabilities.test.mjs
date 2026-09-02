@@ -873,7 +873,7 @@ test('T30 restores only versioned valid state and safely discards corrupt or sta
   assert.equal(persistSession(storage), true);
   const saved = JSON.parse(storage.getItem(SESSION_STORAGE_KEY));
   assert.equal(saved.version, SESSION_STORAGE_VERSION);
-  assert.equal(Object.hasOwn(saved.session, 'resume'), false);
+  assert.equal(saved.session.resume, null);
   assert.equal(saved.session.error, undefined);
   assert.equal(saved.session.scoring, undefined);
 
@@ -895,13 +895,13 @@ test('T30 restores only versioned valid state and safely discards corrupt or sta
   assert.equal(restoreSession(stale), false);
   assert.deepEqual(stale.removed, [SESSION_STORAGE_KEY]);
 
-  // The required copy says the CV is never saved. CV-backed state therefore
-  // clears any older snapshot rather than serializing the raw text or its
-  // derived fit/gap analysis; old version-1 records are removed on sight.
+  // T35 keeps the CV text in the record, so a CV-backed session now
+  // persists under version 3 instead of dropping all progress. Old
+  // version-1 records are still removed on sight by the version check.
   const cv = 'Jane Candidate CV: home address 1 Private Street';
   await setResume(cv, { request: async () => response(briefResponse({ withResume: true })) });
-  assert.equal(persistSession(storage), false);
-  assert.equal(storage.getItem(SESSION_STORAGE_KEY), null);
+  assert.equal(persistSession(storage), true);
+  assert.equal(JSON.parse(storage.getItem(SESSION_STORAGE_KEY)).session.resume, cv);
   const legacy = memoryStorage({
     [SESSION_STORAGE_KEY]: JSON.stringify({
       version: 1,
@@ -1151,4 +1151,142 @@ test('T32 R2 P3-1: a rolled-back plan starts for both callers at the same questi
   assert.equal(session.current, 1);
   assert.equal(session.phase, 'interviewing');
   assert.deepEqual(JSON.parse(agentStart.content[0].text), humanStart.question);
+});
+
+test('T35: a CV-backed session persists with its resume and restores complete', async (t) => {
+  const vite = await createServer({
+    configFile: new URL('../vite.test.config.js', import.meta.url).pathname,
+    server: { middlewareMode: true, hmr: false, ws: false }, appType: 'custom',
+  });
+  t.after(() => vite.close());
+  const capabilities = await vite.ssrLoadModule('/src/lib/session.svelte.js');
+  const { session, setPosting, setResume, persistSession, restoreSession, SESSION_STORAGE_KEY, SESSION_STORAGE_VERSION } = capabilities;
+  reset(session);
+  await setPosting(posting, { request: async () => response(briefResponse()) });
+  const cv = 'Jane Candidate CV: home address 1 Private Street';
+  await setResume(cv, { request: async () => response(briefResponse({ withResume: true })) });
+  session.questions[0].answer = 'A saved answer.';
+  session.questions[0].scores = scoreResponse(4).scores;
+  session.questions[0].missed = scoreResponse(4).missed;
+  session.questions[0].modelAnswer = scoreResponse(4).modelAnswer;
+  session.current = 1;
+  session.phase = 'interviewing';
+
+  const storage = memoryStorage();
+  assert.equal(persistSession(storage), true);
+  const saved = JSON.parse(storage.getItem(SESSION_STORAGE_KEY));
+  assert.equal(saved.version, SESSION_STORAGE_VERSION);
+  assert.equal(saved.session.resume, cv);
+  assert.notEqual(saved.session.fitMatch, null);
+  assert.equal(saved.session.questions.filter((question) => question.targetsGap).length, 3);
+
+  reset(session);
+  session.agentSeen = true;
+  assert.equal(restoreSession(storage), true);
+  assert.equal(session.phase, 'interviewing');
+  assert.equal(session.current, 1);
+  assert.equal(session.posting, posting);
+  assert.equal(session.resume, cv);
+  assert.deepEqual(session.fitMatch, briefResponse({ withResume: true }).fitMatch);
+  assert.equal(session.questions[0].answer, 'A saved answer.');
+  assert.deepEqual(session.questions[0].scores, scoreResponse(4).scores);
+  assert.equal(session.questions.filter((question) => question.targetsGap).length, 3);
+});
+
+test('T35: a version-2 record in the old six-key shape is discarded, never half-read', async (t) => {
+  const vite = await createServer({
+    configFile: new URL('../vite.test.config.js', import.meta.url).pathname,
+    server: { middlewareMode: true, hmr: false, ws: false }, appType: 'custom',
+  });
+  t.after(() => vite.close());
+  const capabilities = await vite.ssrLoadModule('/src/lib/session.svelte.js');
+  const { session, setPosting, persistSession, restoreSession, SESSION_STORAGE_KEY, SESSION_STORAGE_VERSION } = capabilities;
+  reset(session);
+  await setPosting(posting, { request: async () => response(briefResponse()) });
+  session.questions[0].answer = 'A saved answer.';
+  session.questions[0].scores = scoreResponse(4).scores;
+  session.questions[0].missed = scoreResponse(4).missed;
+  session.questions[0].modelAnswer = scoreResponse(4).modelAnswer;
+  session.current = 1;
+  session.phase = 'interviewing';
+  const storage = memoryStorage();
+  assert.equal(persistSession(storage), true);
+
+  // Rebuild the envelope the version-2 build wrote: six session keys with
+  // no resume, stamped with the old version number.
+  const oldRecord = JSON.parse(storage.getItem(SESSION_STORAGE_KEY));
+  assert.equal(oldRecord.version, SESSION_STORAGE_VERSION);
+  delete oldRecord.session.resume;
+  assert.equal(Object.keys(oldRecord.session).length, 6);
+  oldRecord.version = 2;
+  const legacy = memoryStorage({ [SESSION_STORAGE_KEY]: JSON.stringify(oldRecord) });
+
+  reset(session);
+  assert.equal(restoreSession(legacy), false);
+  assert.deepEqual(legacy.removed, [SESSION_STORAGE_KEY]);
+  assert.equal(legacy.getItem(SESSION_STORAGE_KEY), null);
+  assert.equal(session.phase, 'idle');
+  assert.equal(session.questions.length, 0);
+});
+
+test('T35: a stored resume over the character cap invalidates the record', async (t) => {
+  const vite = await createServer({
+    configFile: new URL('../vite.test.config.js', import.meta.url).pathname,
+    server: { middlewareMode: true, hmr: false, ws: false }, appType: 'custom',
+  });
+  t.after(() => vite.close());
+  const capabilities = await vite.ssrLoadModule('/src/lib/session.svelte.js');
+  const { session, setPosting, setResume, persistSession, restoreSession, SESSION_STORAGE_KEY, MAX_RESUME_CHARS } = capabilities;
+  reset(session);
+  await setPosting(posting, { request: async () => response(briefResponse()) });
+  await setResume('Jane Candidate CV.', { request: async () => response(briefResponse({ withResume: true })) });
+  const storage = memoryStorage();
+  assert.equal(persistSession(storage), true);
+  const written = JSON.parse(storage.getItem(SESSION_STORAGE_KEY));
+
+  const bloated = structuredClone(written);
+  bloated.session.resume = 'x'.repeat(MAX_RESUME_CHARS + 1);
+  const over = memoryStorage({ [SESSION_STORAGE_KEY]: JSON.stringify(bloated) });
+  assert.equal(restoreSession(over), false);
+  assert.deepEqual(over.removed, [SESSION_STORAGE_KEY]);
+
+  const atCap = structuredClone(written);
+  atCap.session.resume = 'x'.repeat(MAX_RESUME_CHARS);
+  const edge = memoryStorage({ [SESSION_STORAGE_KEY]: JSON.stringify(atCap) });
+  assert.equal(restoreSession(edge), true);
+  assert.equal(session.resume.length, MAX_RESUME_CHARS);
+});
+
+test('T35: the Plan clear control renders the deck string and startOver lands a clean Start', async (t) => {
+  const vite = await createServer({
+    configFile: new URL('../vite.test.config.js', import.meta.url).pathname,
+    server: { middlewareMode: true, hmr: false, ws: false }, appType: 'custom',
+  });
+  t.after(() => vite.close());
+  const capabilities = await vite.ssrLoadModule('/src/lib/session.svelte.js');
+  const { session, setPosting, setResume, persistSession, restoreSession, startOver, SESSION_STORAGE_KEY } = capabilities;
+  const Plan = await vite.ssrLoadModule('/src/lib/Plan.svelte');
+  const { copy } = await vite.ssrLoadModule('/src/lib/copy.js');
+  const { render } = await vite.ssrLoadModule('svelte/server');
+
+  reset(session);
+  await setPosting(posting, { request: async () => response(briefResponse()) });
+  await setResume('Jane Candidate CV: home address 1 Private Street', {
+    request: async () => response(briefResponse({ withResume: true })),
+  });
+  assert.equal(session.phase, 'ready');
+
+  const { body } = render(Plan.default);
+  assert.ok(body.includes(copy.plan.remove_cv));
+
+  const storage = memoryStorage();
+  assert.equal(persistSession(storage), true);
+  startOver(storage);
+  assert.equal(session.phase, 'idle');
+  assert.equal(session.resume, null);
+  assert.equal(session.posting, null);
+  assert.equal(session.fitMatch, null);
+  assert.equal(storage.getItem(SESSION_STORAGE_KEY), null);
+  assert.equal(restoreSession(storage), false);
+  assert.equal(session.phase, 'idle');
 });

@@ -855,7 +855,8 @@ content. No cancel button, because the call is bounded at two attempts with a
    - Section `You already have this`, fit items from `evidenced`.
    - Section `Things they may ask you about`, fit items from `gaps`, top 3.
 8. Section `Your 8 questions`, eight question cards per 8.7, 12px gap.
-9. Action bar with `Start practice`.
+9. Action bar. Primary `Start practice`. Above it, a quiet secondary
+   `Remove my CV and start over`, stacked with an 8px gap per 7.3.
 
 32px between sections. If `brief.confidence` is `low`, a `--note` message
 strip sits directly under the sub-line.
@@ -1031,7 +1032,7 @@ otherwise. See Section 15.3 for why.
 | `start.cv_label` | Add your CV if you have one. Optional. |
 | `start.cv_hint` | You can practise without it. |
 | `start.cv_paste_label` | Paste your CV here. |
-| `start.privacy` | Your CV stays on your phone or computer. We read the words in it here in your browser. We never save it and there is no account. |
+| `start.privacy` | Your CV stays in this browser on this device. We read it only to build your questions. Nothing is stored on a server. |
 | `start.type_question` | What kind of job are you applying for? |
 | `start.type_warehouse` | Warehouse |
 | `start.type_restaurant` | Restaurant or cafe |
@@ -1065,6 +1066,7 @@ otherwise. See Section 15.3 for why.
 | `plan.may_ask` | Things they may ask you about |
 | `plan.questions` | Your 8 questions |
 | `plan.quote_label` | From the job advert |
+| `plan.remove_cv` | Remove my CV and start over |
 
 ### 11.5 Practice screen
 

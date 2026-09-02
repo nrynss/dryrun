@@ -235,7 +235,7 @@ test('the live chooser exposes the exact always-visible privacy copy and warns w
   }, sessionId);
 
   assert.deepEqual(result.result.value, {
-    privacy: 'Your CV stays on your phone or computer. We read the words in it here in your browser. We never save it and there is no account.',
+    privacy: 'Your CV stays in this browser on this device. We read it only to build your questions. Nothing is stored on a server.',
     warning: 'Your CV was long, so we used the first part of it. That is usually enough.',
     fileName: '✓ long-resume.txt',
   });
