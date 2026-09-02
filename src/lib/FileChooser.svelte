@@ -12,6 +12,7 @@
   import MessageStrip from './MessageStrip.svelte';
   import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist';
   import { copy } from './copy.js';
+  import { isAcceptedResumeFile, prepareUploadedResumeText } from './resume-input.js';
   import { session, MAX_RESUME_CHARS } from './session.svelte.js';
 
   // Same-origin worker for pdf.js (pdfjs-dist is a declared dependency).
@@ -35,14 +36,14 @@
     // file, so the extension decides. The file is rejected — nothing written
     // to session.resume — and the --stop strip explains the formats (11.9
     // names them in capitals because that is how a file picker shows them).
-    if (!/\.(pdf|txt|md)$/i.test(file.name)) {
+    if (!isAcceptedResumeFile(file.name)) {
       error = copy.err.file_type;
       return;
     }
 
     try {
-      let text = /\.pdf$/i.test(file.name) ? await extractPdf(file) : await file.text();
-      text = text.trim();
+      const rawText = /\.pdf$/i.test(file.name) ? await extractPdf(file) : await file.text();
+      const { text, truncated } = prepareUploadedResumeText(rawText, MAX_RESUME_CHARS);
 
       // State 4: under 40 characters trimmed reads as no words at all.
       if (text.length < 40) {
@@ -51,8 +52,7 @@
       }
 
       // State 7: over the cap, keep the first 20,000 characters.
-      if (text.length > MAX_RESUME_CHARS) {
-        text = text.slice(0, MAX_RESUME_CHARS);
+      if (truncated) {
         warning = copy.warn.cv_long;
       }
 
@@ -98,7 +98,7 @@
     </div>
   {:else}
     <input
-      {inputId}
+      id={inputId}
       class="sr-only"
       type="file"
       accept=".pdf,.txt,.md,text/plain,text/markdown,application/pdf"
