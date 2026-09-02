@@ -20,47 +20,44 @@ whenever their dependencies allow.
 
 ## Sequence
 
-| ID | Track | Task | Needs | Blocks |
-|---|---|---|---|---|
-| T01 | Submission | Source the real job posting that ships as the worked example. **Done.** Walmart Connect, Manager Technical Writing, saved to `dev-diary/example-posting.md`. | none | T08 |
-| T02 | Gate | Give `set_posting` a real `execute` handler. Store the posting, flip `session.phase`, render the change. No inference. **Done.** | none | T03 |
-| T03 | Gate | Confirm the tool registers and invokes. **Done.** Verified on the live origin in Chrome 152 with NO flag, driven over the DevTools protocol. `getTools()` returns our tool and `executeTool` ran the handler, flipping the page to `phase: ready`. | T02 | T06 |
-| T04 | Gate | Settle the production origin. **Done.** `dryrun.nryn.dev`, wired as a grey-cloud CNAME in Cloudflare, certificate issued, serving 200. | none | T05 |
-| T05 | Gate | Register the WebMCP origin trial token and serve it. **Done.** Two tokens, one per origin, both expiring 17 Nov 2026, delivered comma-separated in a single `Origin-Trial` header and verified live on both hosts. | T04 | T06 |
-| T06 | Gate | Confirm on the deployed origin inside ChatGPT's in-app browser. **Done.** ChatGPT listed the site tools, called `set_posting`, and the page flipped to `Agent connected` with `phase: ready` untouched by hand. Gate closed. | T03, T05 | T07, T35 |
-| T07 | Shapes | Fix the JSON shapes in one module: `Brief`, `Question`, `FitMatch`, `AnswerScore`, `Verdict`. `Question` must carry `sourceQuote`. | T06 | T08, T09, T10, T13, T21, T22, T25 |
-| T08 | Shapes | Hand-write the example fixture. **Done.** `src/lib/example.json`, validated against `shapes.js`. Eight questions with verbatim quotes, fit match ordered by gap size, three scored answers demonstrating the coverage cap. | T01, T07 | T12, T15, T17, T18 |
-| T09 | Function | Brief task. Fixed prompt plus structured output schema. Posting and optional resume produce brief, eight questions, fit match. | T07 | T11, T12, T25, T26 |
-| T10 | Function | Score task. Fixed prompt plus structured output schema. One answer produces four axis scores, missed points, model answer. | T07 | T11, T12, T28 |
-| T11 | Function | Handle a malformed or refused response without breaking the session. | T09, T10 | T32 |
-| T12 | Function | Measure real token cost against the example posting and check it against the credit budget. | T08, T09, T10 | none |
-| T13 | Interface | `src/app.css`, plus the critical CSS in `index.html`. Design doc sections 5, 6 and 7. Tokens, `color-scheme: light`, the Lexend and Source Sans 3 links, the type scale as classes, the page frame, the spacing scale, the focus rule, the reduced-motion block. **Replace the existing `color-scheme: dark` and `#0A0A0C` in `index.html`.** Done when a blank page renders paper white with ink text in both faces. | T07 | T14, T16 |
-| T14 | Interface | Question card, design doc 8.7, and the source quote, 3.5. Plus Card 8.1 and Button 8.2. Done when all eight fixture questions render with their quotes at 360px and at 900px. | T13 | T15, T17, T18 |
-| T15 | Interface | Practice screen, design doc 9.4. Progress row 8.6, feedback note 8.8. Done when Q1 through Q8 advance and the three scored fixture answers show their feedback. | T08, T14 | T19, T20 |
-| T16 | Interface | Start screen, design doc 9.1. Text box 8.3, file chooser 8.4, ChatGPT line 8.5, message strip 8.13. The `I have a job advert` route only. Done when typing writes `session.posting` **and** setting `session.posting` from the console fills the box. That second half is the display-parity rule, and it is the bug that made the agent path look broken. | T13 | T19 |
-| T17 | Interface | Your practice screen, design doc 9.3. List block 8.9, fit item 8.10. Done when the whole fixture renders with no placeholder text left anywhere. | T08, T14 | T19 |
-| T18 | Interface | Your tips screen, design doc 9.5. Result panel 8.11, score row 8.12, print stylesheet. Done when all four result cases in design doc 14.1 render correctly. Note the fixture alone only ever produces `not yet` plus `capped`, so use the four literal Verdict objects the design doc supplies. | T08, T14 | T19 |
-| T19 | Interface | Every state in design doc section 10, wired to the copy deck in section 11. Build `src/lib/copy.js` first, then replace every inline string. Done when every row of the section 10 table is reachable and shows its exact string. | T15, T16, T17, T18 | T32 |
-| T20 | Interface | Motion, design doc section 12. Done when every row of the section 12 table behaves and `prefers-reduced-motion` is honoured. | T15 | none |
-| T21 | Resume | Install `pdfjs-dist`, wire the same-origin worker, extract text in the browser. | T07 | T23 |
-| T22 | Resume | Accept pasted text and uploaded `.txt` and `.md`. | T07 | T23, T24 |
-| T23 | Resume | The four failure modes: scanned PDF, locked PDF, over-long resume, not a resume. Each needs its own message. | T21, T22 | T33 |
-| T24 | Resume | Privacy copy beside the file picker. | T22 | T33 |
-| T25 | State | `setPosting`. Replace the T02 gate body with a real call to the function. Store brief and questions, handle the error paths. | T07, T09 | T26, T27, T31 |
-| T26 | State | `setResume`. Store resume text, store fit match, re-aim roughly a third of the questions. | T09, T25 | T31 |
-| T27 | State | `getBrief` and `startInterview`. | T25 | T28, T31 |
-| T28 | State | `submitAnswer`. Score, store, advance the index, return the next question or the verdict. | T10, T27 | T29, T31 |
-| T29 | State | `getVerdict`. Band from the average, then apply the coverage cap so a skipped session can never read as ready. | T28 | T30, T31 |
-| T30 | State | Persist to `localStorage` and restore on load. | T29 | T32 |
-| T31 | State | Register the remaining five tools with schemas, descriptions and annotations. `submit_answer` must state that the transcript is the user's spoken answer. **Verified API contract, which differs from every published example:** `executeTool` takes the RegisteredTool object, and its arguments as a **JSON string**, not an object. `getTools()` returns a Promise. `inputSchema` comes back as a string. `annotations.readOnlyHint` auto-populates as `false` when omitted, which is the side-effect signal we want. Details in `dev-diary/example-posting.md`. | T25, T26, T27, T28, T29 | T32 |
-| T32 | Integration | Wire the interface to real state. Keep the fixture only as the function-down path. | T11, T19, T30, T31 | T33, T36, T37 |
-| T33 | Integration | Full run end to end in ChatGPT's in-app browser, using the judge path from the spec. **Three preconditions, every one of them silent when unmet:** ChatGPT must run **GPT-5.6 Sol or Terra**, because Luna has WebMCP disabled and simply shows no tools. Site tools are unavailable in **Enterprise and Edu** workspaces. Availability is also rollout-dependent. Cheaper pre-check: drive headless Chrome over the DevTools protocol, or `--headless --dump-dom`, to confirm registration before opening the app. | T23, T24, T32 | T34, T38 |
-| T34 | Integration | Production deploy, then re-verify headers, the origin trial token and the gateway against the live URL. | T33 | none |
-| T35 | Submission | Write the English description covering WebMCP fit. | T06 | T39 |
-| T36 | Submission | Reconcile the stale `Stack` and `Resume ingestion` sections of `project.md` with what we actually built. | T32 | none |
-| T37 | Submission | Write the demo video script against the judge path. | T32 | T38 |
-| T38 | Submission | Record and upload the video. Under three minutes, with audio. **Set ChatGPT to Sol or Terra before recording.** On Luna the tools vanish from the capture with nothing on screen to explain why. | T33, T37 | T39 |
-| T39 | Submission | Submit on Devpost. | T35, T38 | none |
+| ID | Track | Size | Task | Needs | Blocks |
+|---|---|---|---|---|---|
+| T01 | Submission | S | Source the real job posting that ships as the worked example. **Done.** Walmart Connect, Manager Technical Writing, saved to `dev-diary/example-posting.md`. | none | T08 |
+| T02 | Gate | S | Give `set_posting` a real `execute` handler. Store the posting, flip `session.phase`, render the change. No inference. **Done.** | none | T03 |
+| T03 | Gate | S | Confirm the tool registers and invokes. **Done.** Verified on the live origin in Chrome 152 with NO flag, driven over the DevTools protocol. `getTools()` returns our tool and `executeTool` ran the handler, flipping the page to `phase: ready`. | T02 | T06 |
+| T04 | Gate | S | Settle the production origin. **Done.** `dryrun.nryn.dev`, wired as a grey-cloud CNAME in Cloudflare, certificate issued, serving 200. | none | T05 |
+| T05 | Gate | S | Register the WebMCP origin trial token and serve it. **Done.** Two tokens, one per origin, both expiring 17 Nov 2026, delivered comma-separated in a single `Origin-Trial` header and verified live on both hosts. | T04 | T06 |
+| T06 | Gate | M | Confirm on the deployed origin inside ChatGPT's in-app browser. **Done.** ChatGPT listed the site tools, called `set_posting`, and the page flipped to `Agent connected` with `phase: ready` untouched by hand. Gate closed. | T03, T05 | T07, T35 |
+| T07 | Shapes | M | Fix the JSON shapes in one module: `Brief`, `Question`, `FitMatch`, `AnswerScore`, `Verdict`. `Question` must carry `sourceQuote`. | T06 | T08, T09, T10, T13, T21, T22, T25 |
+| T08 | Shapes | M | Hand-write the example fixture. **Done.** `src/lib/example.json`, validated against `shapes.js`. Eight questions with verbatim quotes, fit match ordered by gap size, three scored answers demonstrating the coverage cap. | T01, T07 | T12, T15, T17, T18 |
+| T09 | Function | L | Brief task. Fixed prompt plus structured output schema. Posting and optional resume produce brief, eight questions, fit match. | T07 | T11, T12, T25, T26 |
+| T10 | Function | M | Score task. Fixed prompt plus structured output schema. One answer produces four axis scores, missed points, model answer. | T07 | T11, T12, T28 |
+| T11 | Function | M | Handle a malformed or refused response without breaking the session. | T09, T10 | T32 |
+| T12 | Function | S | Measure real token cost against the example posting and check it against the credit budget. | T08, T09, T10 | none |
+| T13 | Interface | M | `src/app.css`, plus the critical CSS in `index.html`. Design doc sections 5, 6 and 7. Tokens, `color-scheme: light`, the Lexend and Source Sans 3 links, the type scale as classes, the page frame, the spacing scale, the focus rule, the reduced-motion block. **Replace the existing `color-scheme: dark` and `#0A0A0C` in `index.html`.** Done when a blank page renders paper white with ink text in both faces. | T07 | T14, T16 |
+| T14 | Interface | S | Question card, design doc 8.7, and the source quote, 3.5. Plus Card 8.1 and Button 8.2. Done when all eight fixture questions render with their quotes at 360px and at 900px. | T13 | T15, T17, T18 |
+| T15 | Interface | M | Practice screen, design doc 9.4. Progress row 8.6, feedback note 8.8. Done when Q1 through Q8 advance and the three scored fixture answers show their feedback. | T08, T14 | T19, T20 |
+| T16 | Interface | M | Start screen, design doc 9.1. Text box 8.3, file chooser 8.4, ChatGPT line 8.5, message strip 8.13. The `I have a job advert` route only. Done when typing writes `session.posting` **and** setting `session.posting` from the console fills the box. That second half is the display-parity rule, and it is the bug that made the agent path look broken. | T13 | T19 |
+| T17 | Interface | M | Your practice screen, design doc 9.3. List block 8.9, fit item 8.10. Done when the whole fixture renders with no placeholder text left anywhere. | T08, T14 | T19 |
+| T18 | Interface | M | Your tips screen, design doc 9.5. Result panel 8.11, score row 8.12, print stylesheet. Done when all four result cases in design doc 14.1 render correctly. Note the fixture alone only ever produces `not yet` plus `capped`, so use the four literal Verdict objects the design doc supplies. | T08, T14 | T19 |
+| T19 | Interface | L | Every state in design doc section 10, wired to the copy deck in section 11. Build `src/lib/copy.js` first, then replace every inline string. Done when every row of the section 10 table is reachable and shows its exact string. | T15, T16, T17, T18 | T32 |
+| T20 | Interface | S | Motion, design doc section 12. Done when every row of the section 12 table behaves and `prefers-reduced-motion` is honoured. | T15 | none |
+| T21 | Resume | M | Install `pdfjs-dist`, wire the same-origin worker, extract text in the browser. | T07 | T23 |
+| T22 | Resume | S | Accept pasted text and uploaded `.txt` and `.md`. | T07 | T23, T24 |
+| T23 | Resume | L | The four failure modes: scanned PDF, locked PDF, over-long resume, not a resume. Each needs its own message. | T21, T22 | T33 |
+| T24 | Resume | S | Privacy copy beside the file picker. | T22 | T33 |
+| T25 | State | M | `setPosting`. Replace the T02 gate body with a real call to the function. Store brief and questions, handle the error paths. | T07, T09 | T26, T27, T31 |
+| T26 | State | M | `setResume`. Store resume text, store fit match, re-aim roughly a third of the questions. | T09, T25 | T31 |
+| T27 | State | S | `getBrief` and `startInterview`. | T25 | T28, T31 |
+| T28 | State | M | `submitAnswer`. Score, store, advance the index, return the next question or the verdict. | T10, T27 | T29, T31 |
+| T29 | State | S | `getVerdict`. Band from the average, then apply the coverage cap so a skipped session can never read as ready. | T28 | T30, T31 |
+| T30 | State | M | Persist to `localStorage` and restore on load. | T29 | T32 |
+| T31 | State | M | Register the remaining five tools with schemas, descriptions and annotations. `submit_answer` must state that the transcript is the user's spoken answer. **Verified API contract, which differs from every published example:** `executeTool` takes the RegisteredTool object, and its arguments as a **JSON string**, not an object. `getTools()` returns a Promise. `inputSchema` comes back as a string. `annotations.readOnlyHint` auto-populates as `false` when omitted, which is the side-effect signal we want. Details in `dev-diary/example-posting.md`. | T25, T26, T27, T28, T29 | T32 |
+| T32 | Integration | L | Wire the interface to real state. Keep the fixture only as the function-down path. | T11, T19, T30, T31 | T33, T36 |
+| T33 | Integration | M | Full run end to end in ChatGPT's in-app browser, using the judge path from the spec. **Three preconditions, every one of them silent when unmet:** ChatGPT must run **GPT-5.6 Sol or Terra**, because Luna has WebMCP disabled and simply shows no tools. Site tools are unavailable in **Enterprise and Edu** workspaces. Availability is also rollout-dependent. Cheaper pre-check: drive headless Chrome over the DevTools protocol, or `--headless --dump-dom`, to confirm registration before opening the app. | T23, T24, T32 | T34 |
+| T34 | Integration | S | Production deploy, then re-verify headers, the origin trial token and the gateway against the live URL. | T33 | none |
+| T35 | Submission | S | Write the English description covering WebMCP fit. | T06 | none |
+| T36 | Submission | S | Reconcile the stale `Stack` and `Resume ingestion` sections of `project.md` with what we actually built. | T32 | none |
 
 ---
 
@@ -86,6 +83,18 @@ interface and the fixture together.
 
 T08 earns its place twice. It ships as the demo that survives the function
 failing, and it lets the whole interface track build with no server at all.
+
+## What the sizes mean
+
+Size is relative effort and uncertainty, not duration. It is driven by three
+things: how many files the task touches, whether it needs a live model call to
+verify, and how many distinct failure paths it has to handle.
+
+- **S** One file or one surface. No live verification needed. Few or no failure paths.
+- **M** Several files, or one file with several states. Usually needs a deploy to check.
+- **L** A new subsystem, or many failure paths, or work that needs live iteration to get right.
+
+An L is not necessarily longer than an M. It carries more ways to be wrong.
 
 ## T13 to T20 is one block
 
@@ -119,7 +128,6 @@ is expected and is not a bug in this block. Do not spend the night fixing it.
 - **T25 to T30.** One file, `src/lib/session.svelte.js`. Logically independent,
   but they queue behind each other.
 - **T13 before the rest of the interface.** Every component reads the tokens.
-- **T38.** It needs a working app, so it sits at the tail with T39 behind it.
 
 ## What can run in parallel
 
@@ -133,8 +141,10 @@ and T22 are parallel. So are T09 and T10, and T13 and T16.
 ## Critical path
 
 ```
-T04 -> T05 -> T06 -> T07 -> T08 -> T15 -> T19 -> T32 -> T33 -> T37 -> T38 -> T39
+T04 -> T05 -> T06 -> T07 -> T08 -> T15 -> T19 -> T32 -> T33 -> T34
 ```
 
 T03 runs alongside T04 and T05 rather than on the line, because it only proves
-the code locally. T04 and T38 are the two items on the path that need you.
+the code locally.
+
+T34 is the last item on the path that this plan covers. The submission itself, including the video and the Devpost entry, is out of scope for this file.
