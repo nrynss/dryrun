@@ -1289,4 +1289,8 @@ test('T35: the Plan clear control renders the deck string and startOver lands a 
   assert.equal(storage.getItem(SESSION_STORAGE_KEY), null);
   assert.equal(restoreSession(storage), false);
   assert.equal(session.phase, 'idle');
+  // Without a CV, including on the worked example, the removal offer must
+  // not render.
+  const bare = render(Plan.default);
+  assert.equal(bare.body.includes(copy.plan.remove_cv), false);
 });

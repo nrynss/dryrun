@@ -100,12 +100,15 @@
   </div>
 
   <!-- 9.3 item 9: the action bar (7.3). The quiet secondary sits above the
-       primary: one full-width quiet button, 8px gap before the primary. -->
+       primary: one full-width quiet button, 8px gap before the primary. It
+       only exists when the session carries a CV. -->
   <div class="actionbar">
     <div class="actionbar-inner">
-      <div class="quiets">
-        <Button variant="quiet" style="width: 100%" onclick={removeCv}>{copy.plan.remove_cv}</Button>
-      </div>
+      {#if session.resume}
+        <div class="quiets">
+          <Button variant="quiet" style="width: 100%" onclick={removeCv}>{copy.plan.remove_cv}</Button>
+        </div>
+      {/if}
       <Button onclick={startPractice}>{copy.btn.start}</Button>
     </div>
   </div>
