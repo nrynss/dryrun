@@ -32,6 +32,7 @@ export const copy = {
     again: 'Try again',
     skip: 'Skip this one',
     finish_early: 'Finish and show my tips',
+    end_practice: 'End practice and start over',
     different_job: 'Practise a different job',
     print: 'Print or save these tips',
     choose_file: 'Choose a file',

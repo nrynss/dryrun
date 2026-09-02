@@ -42,7 +42,7 @@ const complete = (data, usage = {}) => ({
   usage: { input_tokens: 123, output_tokens: 45, total_tokens: 168, ...usage },
 });
 const mockHandler = (outcomes, calls = []) => createAnalyzeHandler({
-  retryBackoffMs: 0,
+  retryBackoffMs: 0, logger: () => {},
   clientFactory: () => ({ responses: { create: async (request) => {
     calls.push(request);
     const outcome = outcomes.shift();
@@ -283,6 +283,31 @@ test('malformed output exhaustion is a fixed public error', async () => {
   const response = await call(mockHandler([malformed, malformed]), scoreBody());
   assert.equal(response.status, 502);
   assert.equal((await response.json()).code, 'invalid_provider_output');
+});
+
+test('terminal failures log only redacted diagnostic fields', async () => {
+  const events = [];
+  const upstream = Object.assign(new Error('Resume text must not reach logs.'), {
+    status: 400,
+    code: 'bad_request',
+  });
+  const handler = createAnalyzeHandler({
+    retryBackoffMs: 0,
+    logger: (event, details) => events.push({ event, details }),
+    clientFactory: () => ({ responses: { create: async () => { throw upstream; } } }),
+  });
+
+  const response = await call(handler, scoreBody());
+
+  assert.equal(response.status, 502);
+  assert.deepEqual(events, [{
+    event: 'dryrun.analysis_failure',
+    details: {
+      task: 'score',
+      error: { name: 'Error', status: 400, code: 'bad_request' },
+    },
+  }]);
+  assert.equal(JSON.stringify(events).includes('Resume text'), false);
 });
 
 test('provider refusal is not retried and receives its fixed public response', async () => {

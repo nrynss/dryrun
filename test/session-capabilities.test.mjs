@@ -913,6 +913,44 @@ test('T30 restores only versioned valid state and safely discards corrupt or sta
   assert.deepEqual(legacy.removed, [SESSION_STORAGE_KEY]);
 });
 
+test('startOver clears interview state and its saved progress', async (t) => {
+  const vite = await createServer({
+    configFile: new URL('../vite.test.config.js', import.meta.url).pathname,
+    server: { middlewareMode: true, hmr: false, ws: false }, appType: 'custom',
+  });
+  t.after(() => vite.close());
+  const capabilities = await vite.ssrLoadModule('/src/lib/session.svelte.js');
+  const { session, setPosting, persistSession, startOver, SESSION_STORAGE_KEY } = capabilities;
+  reset(session);
+  await setPosting(posting, { request: async () => response(briefResponse()) });
+  session.questions[0].answer = 'A saved answer.';
+  session.questions[0].scores = scoreResponse(4).scores;
+  session.questions[0].missed = scoreResponse(4).missed;
+  session.questions[0].modelAnswer = scoreResponse(4).modelAnswer;
+  session.current = 1;
+  session.phase = 'interviewing';
+  const storage = memoryStorage();
+  assert.equal(persistSession(storage), true);
+
+  startOver(storage);
+
+  assert.deepEqual({
+    phase: session.phase,
+    posting: session.posting,
+    resume: session.resume,
+    brief: session.brief,
+    fitMatch: session.fitMatch,
+    questions: session.questions,
+    current: session.current,
+    error: session.error,
+    scoring: session.scoring,
+  }, {
+    phase: 'idle', posting: null, resume: null, brief: null, fitMatch: null,
+    questions: [], current: 0, error: null, scoring: false,
+  });
+  assert.equal(storage.getItem(SESSION_STORAGE_KEY), null);
+});
+
 test('T32 P2-3: startInterview exempts only the worked example from the pristine guard', async (t) => {
   const vite = await createServer({
     configFile: new URL('../vite.test.config.js', import.meta.url).pathname,

@@ -267,6 +267,29 @@ export function abandonScoring() {
   supersedeActiveScoreRequest();
 }
 
+/** Leaves an interview without retaining its posting, answers, or progress. */
+export function startOver(storage = storageForBrowser()) {
+  supersedeActiveBriefRequest();
+  supersedeActiveScoreRequest();
+  session.posting = null;
+  session.resume = null;
+  session.brief = null;
+  session.fitMatch = null;
+  session.questions = [];
+  session.current = 0;
+  session.error = null;
+  session.agentSeen = false;
+  session.lastCallAt = null;
+  session.serviceDown = false;
+  session.isExample = false;
+  session.scoreFailed = false;
+  session.scoring = false;
+  session.phase = 'idle';
+  lastAcceptedBriefProjection = null;
+  initialBriefProjection = null;
+  removePersistedSession(storage);
+}
+
 function isCurrentScoreRequest(generation) {
   return generation === scoreRequestGeneration;
 }

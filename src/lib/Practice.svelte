@@ -16,7 +16,7 @@
   import { copy } from './copy.js';
   import { TOTAL_QUESTIONS } from './shapes.js';
   import { hasModelContext } from './webmcp.js';
-  import { MAX_ANSWER_CHARS, session, submitAnswer, abandonScoring } from './session.svelte.js';
+  import { MAX_ANSWER_CHARS, session, submitAnswer, abandonScoring, startOver } from './session.svelte.js';
 
   let question = $derived(session.questions[session.current]);
   let connected = $derived(hasModelContext());
@@ -123,6 +123,10 @@
     session.phase = 'done';
   }
 
+  function endPractice() {
+    startOver();
+  }
+
   function advance() {
     session.scoreFailed = false; // state 12: never carry the failure forward
     if (session.current < TOTAL_QUESTIONS - 1) {
@@ -195,6 +199,9 @@
             {copy.btn.finish_early}
           </Button>
         {/if}
+        <Button variant="quiet" style="width: 100%" onclick={endPractice}>
+          {copy.btn.end_practice}
+        </Button>
       </div>
       {#if blocked === 'empty'}
         <!-- Section 10 state 13: the block sits directly above the primary.

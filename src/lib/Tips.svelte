@@ -10,7 +10,7 @@
   import ScoreRow from './ScoreRow.svelte';
   import { copy } from './copy.js';
   import { AXES } from './shapes.js';
-  import { session, getVerdict } from './session.svelte.js';
+  import { session, getVerdict, startOver } from './session.svelte.js';
 
   // T32: the top-level verdict comes from the same capability an agent's
   // get_verdict tool call returns. A human never reads a different band,
@@ -43,23 +43,7 @@
   }
 
   function differentJob() {
-    // Back to a clean Start screen: every field reset, phase idle. The T19
-    // flags reset too — a different job is never the worked example, and a
-    // fresh Start carries no failure or in-flight state.
-    session.posting = null;
-    session.resume = null;
-    session.brief = null;
-    session.fitMatch = null;
-    session.questions = [];
-    session.current = 0;
-    session.error = null;
-    session.agentSeen = false;
-    session.lastCallAt = null;
-    session.serviceDown = false;
-    session.isExample = false;
-    session.scoreFailed = false;
-    session.scoring = false;
-    session.phase = 'idle';
+    startOver();
   }
 
   function printTips() {
