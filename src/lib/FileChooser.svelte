@@ -12,7 +12,12 @@
   import MessageStrip from './MessageStrip.svelte';
   import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist';
   import { copy } from './copy.js';
-  import { isAcceptedResumeFile, prepareUploadedResumeText } from './resume-input.js';
+  import {
+    hasExtractablePdfText,
+    isAcceptedResumeFile,
+    isPasswordProtectedPdfError,
+    prepareUploadedResumeText,
+  } from './resume-input.js';
   import { session, MAX_RESUME_CHARS } from './session.svelte.js';
 
   // Same-origin worker for pdf.js (pdfjs-dist is a declared dependency).
@@ -41,12 +46,17 @@
       return;
     }
 
+    // Keep the file category available to the error boundary. A read failure
+    // for TXT or MD is not evidence that the file is a scanned PDF.
+    const isPdf = /\.pdf$/i.test(file.name);
+
     try {
-      const rawText = /\.pdf$/i.test(file.name) ? await extractPdf(file) : await file.text();
+      const rawText = isPdf ? await extractPdf(file) : await file.text();
       const { text, truncated } = prepareUploadedResumeText(rawText, MAX_RESUME_CHARS);
 
-      // State 4: under 40 characters trimmed reads as no words at all.
-      if (text.length < 40) {
+      // State 4 applies only to PDFs. Short TXT/MD uploads remain usable CV
+      // excerpts; calling either one a photo or scan would be misleading.
+      if (isPdf && !hasExtractablePdfText(text)) {
         error = copy.err.pdf_scan;
         return;
       }
@@ -59,10 +69,13 @@
       session.resume = text;
       fileName = file.name;
     } catch (err) {
-      // One catch covers the extraction modes in T16's scope: a password
-      // exception is its own message, everything else is a scan failure.
-      // State 5 (locked) and state 4 (scan); T23 owns the full matrix.
-      error = err?.name === 'PasswordException' ? copy.err.pdf_locked : copy.err.pdf_scan;
+      // States 4 and 5 are PDF-only. A local TXT/MD read failure gets the
+      // approved generic error rather than false scan or password advice.
+      // Nothing in this boundary assigns session.resume, so an existing
+      // pasted CV stays in session state unchanged.
+      error = isPdf
+        ? (isPasswordProtectedPdfError(err) ? copy.err.pdf_locked : copy.err.pdf_scan)
+        : copy.err.unknown;
     }
   }
 
