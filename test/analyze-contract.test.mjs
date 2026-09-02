@@ -210,7 +210,7 @@ test('a verbatim quote survives a posting that was wrapped mid-sentence', () => 
 test('the score ceiling can hold everything the score schema allows', () => {
   // modelAnswer is capped at 900 characters and missed at six items of 240.
   // Four characters per token is the usual rough conversion.
-  const worstCaseTokens = Math.ceil(900 / 4) + Math.ceil((6 * 240) / 4) + 30;
+  const worstCaseTokens = Math.ceil(1400 / 4) + Math.ceil((6 * 320) / 4) + 30;
   const reasoningAllowance = 100;
   assert.ok(
     SCORE_MAX_OUTPUT_TOKENS >= worstCaseTokens + reasoningAllowance,
