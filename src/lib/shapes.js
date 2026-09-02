@@ -23,6 +23,28 @@ export const AXES = ['specificity', 'evidence', 'structure', 'relevance'];
 export const COVERAGE_FLOOR = 6;
 
 /**
+ * Bound on how many of the eight questions may target a resume gap, checked
+ * only when the fit match found real gaps.
+ *
+ * This is deliberately wider than the prompt's own 2-to-4 guidance.
+ * MAX_MODEL_ATTEMPTS is 2. A bound that fires on ordinary model variance
+ * costs the user a usable question set, not just a nicer one.
+ *
+ * Measured against a live draft deploy running gpt-5.6-luna. 10 runs used a
+ * sparse, jargon-free CV with several real gaps. 10 more used a strong CV
+ * with one or two gaps. Every run landed inside 2 to 4 on its own. The model
+ * never needed this bound to hold the line.
+ *
+ * 1 and 6 sit one full question outside that observed range on each side.
+ * That leaves room to absorb further variance. It still rejects the two
+ * shapes this bound exists to catch. The first is 0 of 8: a resume with a
+ * real gap that no question tests. The second is 7 or 8 of 8, the original
+ * defect. There every question targeted a gap, and none were answerable.
+ */
+export const MIN_GAP_TARGETED = 1;
+export const MAX_GAP_TARGETED = 6;
+
+/**
  * @typedef {object} Brief
  * @property {string[]} owns    What the role actually owns day to day.
  * @property {string[]} study   What to read before the interview.
@@ -105,6 +127,23 @@ export function buildVerdict(scores) {
 }
 
 /**
+ * Whether a quote appears in the posting, ignoring how the text was wrapped.
+ *
+ * People paste from LinkedIn, from a PDF, or from a browser window, and all of
+ * those wrap lines mid-sentence. The model reads the wrapped text and quotes it
+ * back with ordinary spacing, so a raw substring match rejects a quote that is
+ * genuinely verbatim. That burned a retry and could return an error to someone
+ * who did nothing wrong.
+ *
+ * This still catches the case we actually care about, which is a paraphrased or
+ * invented quote. Only whitespace is forgiven.
+ */
+export function quoteAppearsIn(posting, quote) {
+  const flatten = (text) => String(text).replace(/\s+/g, ' ').trim();
+  return flatten(posting).includes(flatten(quote));
+}
+
+/**
  * Checks a model response before the session trusts it. A malformed response
  * mid-interview breaks the demo in front of a judge, so the function rejects
  * and retries rather than storing a half-object.
@@ -163,7 +202,7 @@ export function validateBriefResponse(data, context = {}) {
       ids.add(q?.id);
       if (!isBoundedString(q.prompt, 360)) problems.push(`Question ${i + 1} has an invalid prompt.`);
       if (!isBoundedString(q.sourceQuote, 600)) problems.push(`Question ${i + 1} has an invalid sourceQuote.`);
-      else if (context.posting && !context.posting.includes(q.sourceQuote)) {
+      else if (context.posting && !quoteAppearsIn(context.posting, q.sourceQuote)) {
         problems.push(`Question ${i + 1} sourceQuote is not verbatim in the posting.`);
       }
       if (typeof q?.targetsGap !== 'boolean') problems.push(`Question ${i + 1} is missing targetsGap.`);
@@ -197,6 +236,18 @@ export function validateBriefResponse(data, context = {}) {
         else {
           if (size > lastSize) problems.push('Fit gaps are not ordered largest first.');
           lastSize = size;
+        }
+      }
+
+      // See MIN_GAP_TARGETED and MAX_GAP_TARGETED above for why this bound
+      // sits where it does.
+      if (Array.isArray(qs) && Array.isArray(gaps)) {
+        const gapTargeted = qs.filter((q) => q?.targetsGap === true).length;
+        if (gaps.length > 0 && (gapTargeted < MIN_GAP_TARGETED || gapTargeted > MAX_GAP_TARGETED)) {
+          problems.push(`Expected between ${MIN_GAP_TARGETED} and ${MAX_GAP_TARGETED} gap-targeted questions for a resume with real gaps, got ${gapTargeted}.`);
+        }
+        if (gaps.length === 0 && gapTargeted > 0) {
+          problems.push('No gaps were found, so no question can target one.');
         }
       }
     }

@@ -9,6 +9,10 @@ import {
   MAX_POSTING_CHARS,
   MAX_RESUME_CHARS,
   MAX_SCORE_INPUT_CHARS,
+  MIN_GAP_TARGETED,
+  quoteAppearsIn,
+  MAX_GAP_TARGETED,
+  TOTAL_QUESTIONS,
   validateBriefResponse,
   validateScoreResponse,
 } from '../src/lib/shapes.js';
@@ -16,6 +20,7 @@ import {
   BRIEF_MAX_OUTPUT_TOKENS,
   SCORE_MAX_OUTPUT_TOKENS,
   MODEL_TIMEOUT_MS,
+  INVOCATION_BUDGET_MS,
   createAnalyzeHandler,
 } from '../netlify/functions/analyze.mts';
 
@@ -27,7 +32,9 @@ const brief = { owns: ['API documentation'], study: ['The API'], angles: ['Accur
 const validBrief = (withResume = false) => ({
   brief: structuredClone(brief),
   questions: Array.from({ length: 8 }, (_, index) => ({ id: `q${index + 1}`, prompt: `Question ${index + 1}`, sourceQuote: 'API documentation', targetsGap: withResume && index === 0 })),
-  fitMatch: withResume ? { evidenced: [{ requirement: 'Writing', evidence: 'Resume says writing.' }], gaps: [], confidence: 'high' } : null,
+  // A gap-targeted question needs a real gap behind it: fitMatch.gaps carries
+  // one so the fixture stays consistent with the gap-targeting bound.
+  fitMatch: withResume ? { evidenced: [{ requirement: 'Writing', evidence: 'Resume says writing.' }], gaps: [{ requirement: 'API tooling', why: 'Resume shows no API experience.', size: 3 }], confidence: 'high' } : null,
 });
 const validScore = { scores: { specificity: 4, evidence: 3, structure: 4, relevance: 5 }, missed: ['Add a concrete result.'], modelAnswer: 'Give a concise, role-grounded example.' };
 const complete = (data, usage = {}) => ({
@@ -75,6 +82,34 @@ test('brief validator rejects invented quotes and all no-resume fit/gap output',
 
 test('brief validator requires a fit match when a resume exists', () => {
   assert.ok(validateBriefResponse(validBrief(), { posting, requireFitMatch: true }).some((problem) => problem.includes('Missing fit match')));
+});
+
+test('gap-targeting bound is enforced only when the resume produced real gaps', () => {
+  const withCount = (n) => {
+    const response = validBrief(true);
+    response.questions.forEach((q, i) => { q.targetsGap = i < n; });
+    return response;
+  };
+
+  // Inside the bound: no problem, at both ends of the range.
+  assert.deepEqual(validateBriefResponse(withCount(MIN_GAP_TARGETED), { requireFitMatch: true }), []);
+  assert.deepEqual(validateBriefResponse(withCount(MAX_GAP_TARGETED), { requireFitMatch: true }), []);
+
+  // Below the bound. Zero gap-targeted questions against a resume with a real
+  // gap is one of the two shapes this bound exists to catch.
+  if (MIN_GAP_TARGETED > 0) {
+    assert.ok(validateBriefResponse(withCount(MIN_GAP_TARGETED - 1), { requireFitMatch: true }).some((p) => p.includes('gap-targeted questions')));
+  }
+
+  // Above the bound, including the exact historical defect: every one of the
+  // eight questions targeting a gap, leaving nothing answerable.
+  assert.ok(validateBriefResponse(withCount(MAX_GAP_TARGETED + 1), { requireFitMatch: true }).some((p) => p.includes('gap-targeted questions')));
+  assert.ok(validateBriefResponse(withCount(TOTAL_QUESTIONS), { requireFitMatch: true }).some((p) => p.includes('gap-targeted questions')));
+
+  // No real gaps found: no question may target one, regardless of the bound.
+  const noGaps = validBrief(true);
+  noGaps.fitMatch.gaps = [];
+  assert.ok(validateBriefResponse(noGaps, { requireFitMatch: true }).some((p) => p.includes('No gaps were found')));
 });
 
 test('score validator rejects fractional axis values', () => {
@@ -157,7 +192,30 @@ test('successful mocked brief call sends bounded structured output and complete 
     model: 'gpt-5.6-luna', attempts: 1, inputTokens: 123, outputTokens: 45, totalTokens: 168,
     inputTokensDetails: { cachedTokens: 12, cacheWriteTokens: 7 }, outputTokensDetails: { reasoningTokens: 9 },
   });
-  assert.equal(MODEL_TIMEOUT_MS, 10_000);
+  // Assert the relationships that matter rather than the literal values, so a
+  // deliberate tuning change does not read as a regression.
+  assert.ok(MODEL_TIMEOUT_MS <= INVOCATION_BUDGET_MS, 'one attempt must fit the invocation budget');
+  assert.ok(INVOCATION_BUDGET_MS < 30_000, 'the budget must stay under the Netlify platform cutoff');
+});
+
+test('a verbatim quote survives a posting that was wrapped mid-sentence', () => {
+  // How a posting arrives when someone copies it out of LinkedIn or a PDF.
+  const wrapped = 'Develop, maintain, and proofread API technical\ndocumentation for the developer portal.';
+  const quote = 'Develop, maintain, and proofread API technical documentation for the developer portal.';
+  assert.ok(quoteAppearsIn(wrapped, quote), 'wrapping must not reject a genuine quote');
+  assert.ok(!quoteAppearsIn(wrapped, 'Own the developer portal roadmap.'), 'an invented quote must still fail');
+  assert.ok(!quoteAppearsIn(wrapped, 'proofread the API documentation'), 'a paraphrase must still fail');
+});
+
+test('the score ceiling can hold everything the score schema allows', () => {
+  // modelAnswer is capped at 900 characters and missed at six items of 240.
+  // Four characters per token is the usual rough conversion.
+  const worstCaseTokens = Math.ceil(900 / 4) + Math.ceil((6 * 240) / 4) + 30;
+  const reasoningAllowance = 100;
+  assert.ok(
+    SCORE_MAX_OUTPUT_TOKENS >= worstCaseTokens + reasoningAllowance,
+    `ceiling ${SCORE_MAX_OUTPUT_TOKENS} cannot hold ${worstCaseTokens} schema tokens plus reasoning`,
+  );
 });
 
 test('a returned full brief question forwards to score, while only scoring context reaches the provider', async () => {

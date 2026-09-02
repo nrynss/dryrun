@@ -98,7 +98,7 @@ details in the contest flow.
    what the posting asks for that you have not. It orders them by the size of the gap.
    Roughly a third of the questions then aim at those gaps.
 4. ChatGPT asks the questions out loud. You answer out loud.
-5. The page scores each answer against a fixed rubric as it lands, and updates while you talk.
+5. The page scores each answer as you finish it, against a fixed rubric.
 6. A verdict: band, per-question scores, missed points, model answers.
 
 Every step is also a button. A human with no agent gets the same product by tapping.
