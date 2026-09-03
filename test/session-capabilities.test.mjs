@@ -65,7 +65,7 @@ function deferred() {
 
 function reset(session) {
   Object.assign(session, {
-    phase: 'idle', posting: null, resume: null, brief: null, fitMatch: null,
+    phase: 'idle', posting: null, resume: null, resumeName: null, brief: null, fitMatch: null,
     questions: [], current: 0, error: null, agentSeen: false, lastCallAt: null,
     serviceDown: false, isExample: false, scoreFailed: false, scoring: false,
   });
@@ -932,7 +932,7 @@ test('startOver clears interview state and its saved progress', async (t) => {
   const storage = memoryStorage();
   assert.equal(persistSession(storage), true);
 
-  startOver(storage);
+  startOver({ storage });
 
   assert.deepEqual({
     phase: session.phase,
@@ -1281,7 +1281,7 @@ test('T35: the Plan clear control renders the deck string and startOver lands a 
 
   const storage = memoryStorage();
   assert.equal(persistSession(storage), true);
-  startOver(storage);
+  startOver({ storage });
   assert.equal(session.phase, 'idle');
   assert.equal(session.resume, null);
   assert.equal(session.posting, null);
@@ -1293,4 +1293,55 @@ test('T35: the Plan clear control renders the deck string and startOver lands a 
   // not render.
   const bare = render(Plan.default);
   assert.equal(bare.body.includes(copy.plan.remove_cv), false);
+});
+
+test('the practice exits keep the CV while the plan removal control drops it', async (t) => {
+  const vite = await createServer({
+    configFile: new URL('../vite.test.config.js', import.meta.url).pathname,
+    server: { middlewareMode: true, hmr: false, ws: false }, appType: 'custom',
+  });
+  t.after(() => vite.close());
+  const capabilities = await vite.ssrLoadModule('/src/lib/session.svelte.js');
+  const { session, setPosting, setResume, persistSession, startOver, SESSION_STORAGE_KEY } = capabilities;
+  const Start = await vite.ssrLoadModule('/src/lib/Start.svelte');
+  const { render } = await vite.ssrLoadModule('svelte/server');
+
+  const cv = 'Jane Candidate CV: wrote internal guides for two years.';
+  reset(session);
+  await setPosting(posting, { request: async () => response(briefResponse()) });
+  await setResume(cv, { request: async () => response(briefResponse({ withResume: true })) });
+  session.resumeName = 'jane-cv.pdf';
+  session.phase = 'interviewing';
+  session.current = 3;
+  const storage = memoryStorage();
+  assert.equal(persistSession(storage), true);
+
+  // End practice and start over, and Practise a different job.
+  startOver({ keepResume: true, storage });
+  assert.equal(session.phase, 'idle');
+  assert.equal(session.resume, cv);
+  assert.equal(session.resumeName, 'jane-cv.pdf');
+  // Everything the exit does mean is still gone.
+  assert.equal(session.posting, null);
+  assert.equal(session.brief, null);
+  assert.equal(session.fitMatch, null);
+  assert.deepEqual(session.questions, []);
+  assert.equal(session.current, 0);
+  assert.equal(storage.getItem(SESSION_STORAGE_KEY), null);
+
+  // Start shows the kept file rather than an empty chooser, so nobody is
+  // asked to upload a CV the session still holds.
+  const { body } = render(Start.default);
+  assert.ok(body.includes('jane-cv.pdf'));
+
+  // A pasted CV has no file name, so Start opens the paste box with the text
+  // in it instead of leaving the CV invisible behind a collapsed panel.
+  session.resumeName = null;
+  const pasted = render(Start.default);
+  assert.ok(pasted.body.includes(cv));
+
+  // Remove my CV and start over keeps its meaning.
+  startOver({ storage });
+  assert.equal(session.resume, null);
+  assert.equal(session.resumeName, null);
 });

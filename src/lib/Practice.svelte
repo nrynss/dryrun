@@ -124,7 +124,9 @@
   }
 
   function endPractice() {
-    startOver();
+    // Ends this practice, not the person's CV. They keep it for the next job,
+    // and the plan screen still offers the one control that removes it.
+    startOver({ keepResume: true });
   }
 
   function advance() {

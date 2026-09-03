@@ -26,7 +26,12 @@
     import.meta.url,
   ).href;
 
-  let fileName = $state(null); // non-null once a file has been read
+  // The chosen file's name lives on session (R1), not here: this component
+  // unmounts on every screen change, and a CV that outlives the screen must
+  // still show its file when the person comes back to Start.
+  // A file name means something only while its CV text is still there, and a
+  // rolled-back brief can drop the CV without going through this component.
+  let fileName = $derived(session.resume ? session.resumeName : null);
   let error = $state(null); // copy string for a --stop strip, or null
   let warning = $state(null); // copy string for a --almost strip, or null
 
@@ -67,7 +72,7 @@
       }
 
       session.resume = text;
-      fileName = file.name;
+      session.resumeName = file.name;
     } catch (err) {
       // States 4 and 5 are PDF-only. A local TXT/MD read failure gets the
       // approved generic error rather than false scan or password advice.
@@ -94,7 +99,7 @@
   function onRemove() {
     // Remove clears the CV box too: the box binds session.resume (R1).
     session.resume = null;
-    fileName = null;
+    session.resumeName = null;
     error = null;
     warning = null;
   }

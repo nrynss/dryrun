@@ -20,7 +20,10 @@
 
   // The single start choice toggles its own panel; it starts expanded.
   let expanded = $state(true);
-  let pasteCv = $state(false);
+  // A CV that came back from a start-over must be visible, not hidden behind
+  // a collapsed panel. A pasted one has no file name for the chooser to show,
+  // so the paste box opens with the text already in it.
+  let pasteCv = $state(!!session.resume && !session.resumeName);
   // Section 10 state 7 on the paste route. FileChooser warns while the file
   // is read. Warn while the CV is pasted, for the same reason. A flag set
   // on the way out is never seen, because setPosting leaves this screen in

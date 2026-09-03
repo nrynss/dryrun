@@ -31,8 +31,9 @@
   }
 
   function removeCv() {
-    // T35: one exit for the CV and everything derived from it. startOver is
-    // the same capability Tips differentJob uses, so both doors match.
+    // T35: one exit for the CV and everything derived from it. This is the
+    // only control that names the CV, so it is the only one that drops it.
+    // The practice exits keep the CV instead (startOver's keepResume).
     startOver();
   }
 </script>

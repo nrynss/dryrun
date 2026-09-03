@@ -15,6 +15,11 @@ export const session = $state({
   phase: 'idle',
   posting: null,
   resume: null,
+  /** @type {string|null} Name of the uploaded CV file, when the CV came from
+   *  a file. FileChooser owns it. It lives here, not in that component,
+   *  because the component unmounts on every screen change. A kept CV must
+   *  still show its file when the person returns to Start. */
+  resumeName: null,
   brief: null,
   fitMatch: null,
   /** @type {Array<{ id: string, prompt: string, sourceQuote: string, targetsGap: boolean, answer: string|null, scores: object|null, missed: string[], modelAnswer?: string }>} */
@@ -268,12 +273,23 @@ export function abandonScoring() {
   supersedeActiveScoreRequest();
 }
 
-/** Leaves an interview without retaining its posting, answers, or progress. */
-export function startOver(storage = storageForBrowser()) {
+/**
+ * Leaves an interview without retaining its posting, answers, or progress.
+ *
+ * `keepResume` decides what happens to the CV. The two exits that mean
+ * `practise something else` keep it, because uploading a CV again is work
+ * the person has already done and did not ask to undo. The plan screen's
+ * `Remove my CV and start over` is the one door that means the CV itself,
+ * so it clears it.
+ */
+export function startOver({ keepResume = false, storage = storageForBrowser() } = {}) {
   supersedeActiveBriefRequest();
   supersedeActiveScoreRequest();
   session.posting = null;
-  session.resume = null;
+  if (!keepResume) {
+    session.resume = null;
+    session.resumeName = null;
+  }
   session.brief = null;
   session.fitMatch = null;
   session.questions = [];

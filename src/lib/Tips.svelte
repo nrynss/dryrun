@@ -43,7 +43,9 @@
   }
 
   function differentJob() {
-    startOver();
+    // A different job, the same person: the CV carries over so Start opens
+    // with it already there.
+    startOver({ keepResume: true });
   }
 
   function printTips() {

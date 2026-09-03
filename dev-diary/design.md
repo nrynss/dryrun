@@ -873,7 +873,11 @@ screen becomes Start with a message strip.
 8. Section `Your 8 questions`, eight question cards per 8.7, 12px gap.
 9. Action bar. Primary `Start practice`. Above it, when the session
    carries a CV, a quiet secondary `Remove my CV and start over`, stacked
-   with an 8px gap per 7.3.
+   with an 8px gap per 7.3. This is the only control that removes the CV.
+   The two practice exits, `End practice and start over` (9.4) and
+   `Practise a different job` (9.5), drop the posting, the plan, the answers
+   and the saved progress. They carry the CV to the Start screen, where it is
+   already in place. Nobody re-uploads a CV the session still holds.
 
 32px between sections. If `brief.confidence` is `low`, a `--note` message
 strip sits directly under the sub-line.
