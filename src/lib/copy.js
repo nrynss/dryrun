@@ -93,7 +93,7 @@ export const copy = {
     may_ask: 'Things they may ask you about',
     questions: 'Your 8 questions',
     quote_label: 'From the job advert',
-    remove_cv: 'Remove my CV and start over',
+    start_over: 'Start over',
   },
 
   /* 11.5 Practice screen */

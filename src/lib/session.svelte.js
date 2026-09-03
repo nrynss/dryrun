@@ -276,13 +276,10 @@ export function abandonScoring() {
 /**
  * Leaves an interview without retaining its posting, answers, or progress.
  *
- * `keepResume` decides what happens to the CV. The two exits that mean
- * `practise something else` keep it, because uploading a CV again is work
- * the person has already done and did not ask to undo. The plan screen's
- * `Remove my CV and start over` is the one door that means the CV itself,
- * so it clears it.
+ * `keepResume` decides what happens to the CV. All exits keep the CV
+ * by default. Uploading a CV is work the person has already done.
  */
-export function startOver({ keepResume = false, storage = storageForBrowser() } = {}) {
+export function startOver({ keepResume = true, storage = storageForBrowser() } = {}) {
   supersedeActiveBriefRequest();
   supersedeActiveScoreRequest();
   session.posting = null;

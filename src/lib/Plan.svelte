@@ -30,11 +30,8 @@
     startInterview();
   }
 
-  function removeCv() {
-    // T35: one exit for the CV and everything derived from it. This is the
-    // only control that names the CV, so it is the only one that drops it.
-    // The practice exits keep the CV instead (startOver's keepResume).
-    startOver();
+  function onStartOver() {
+    startOver({ keepResume: true });
   }
 </script>
 
@@ -100,15 +97,12 @@
   </div>
 
   <!-- 9.3 item 9: the action bar (7.3). The quiet secondary sits above the
-       primary: one full-width quiet button, 8px gap before the primary. It
-       only exists when the session carries a CV. -->
+       primary: one full-width quiet button, 8px gap before the primary. -->
   <div class="actionbar">
     <div class="actionbar-inner">
-      {#if session.resume}
-        <div class="quiets">
-          <Button variant="quiet" style="width: 100%" onclick={removeCv}>{copy.plan.remove_cv}</Button>
-        </div>
-      {/if}
+      <div class="quiets">
+        <Button variant="quiet" style="width: 100%" onclick={onStartOver}>{copy.plan.start_over}</Button>
+      </div>
       <Button onclick={startPractice}>{copy.btn.start}</Button>
     </div>
   </div>

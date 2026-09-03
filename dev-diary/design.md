@@ -871,13 +871,10 @@ screen becomes Start with a message strip.
    - Section `You already have this`, fit items from `evidenced`.
    - Section `Things they may ask you about`, fit items from `gaps`, top 3.
 8. Section `Your 8 questions`, eight question cards per 8.7, 12px gap.
-9. Action bar. Primary `Start practice`. Above it, when the session
-   carries a CV, a quiet secondary `Remove my CV and start over`, stacked
-   with an 8px gap per 7.3. This is the only control that removes the CV.
-   The two practice exits, `End practice and start over` (9.4) and
-   `Practise a different job` (9.5), drop the posting, the plan, the answers
-   and the saved progress. They carry the CV to the Start screen, where it is
-   already in place. Nobody re-uploads a CV the session still holds.
+9. Action bar. Primary `Start practice`. Above it, a quiet secondary `Start over`,
+   stacked with an 8px gap per 7.3. Starting over returns to the Start screen
+   while keeping the CV in place. The person does not need to re-upload or
+   re-paste their CV for the next job posting.
 
 32px between sections. If `brief.confidence` is `low`, a `--note` message
 strip sits directly under the sub-line.
@@ -1093,7 +1090,7 @@ decorative Open Path SVG mark mounts once beside it in the app shell.
 | `plan.may_ask` | Things they may ask you about |
 | `plan.questions` | Your 8 questions |
 | `plan.quote_label` | From the job advert |
-| `plan.remove_cv` | Remove my CV and start over |
+| `plan.start_over` | Start over |
 
 ### 11.5 Practice screen
 

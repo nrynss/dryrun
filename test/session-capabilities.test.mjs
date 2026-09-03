@@ -1277,25 +1277,24 @@ test('T35: the Plan clear control renders the deck string and startOver lands a 
   assert.equal(session.phase, 'ready');
 
   const { body } = render(Plan.default);
-  assert.ok(body.includes(copy.plan.remove_cv));
+  assert.ok(body.includes(copy.plan.start_over));
 
   const storage = memoryStorage();
   assert.equal(persistSession(storage), true);
   startOver({ storage });
   assert.equal(session.phase, 'idle');
-  assert.equal(session.resume, null);
+  assert.equal(session.resume, 'Jane Candidate CV: home address 1 Private Street');
   assert.equal(session.posting, null);
   assert.equal(session.fitMatch, null);
   assert.equal(storage.getItem(SESSION_STORAGE_KEY), null);
   assert.equal(restoreSession(storage), false);
   assert.equal(session.phase, 'idle');
-  // Without a CV, including on the worked example, the removal offer must
-  // not render.
+  // With or without a CV, Start over renders cleanly in the action bar.
   const bare = render(Plan.default);
-  assert.equal(bare.body.includes(copy.plan.remove_cv), false);
+  assert.ok(bare.body.includes(copy.plan.start_over));
 });
 
-test('the practice exits keep the CV while the plan removal control drops it', async (t) => {
+test('all start-over exits keep the CV while posting and progress are cleared', async (t) => {
   const vite = await createServer({
     configFile: new URL('../vite.test.config.js', import.meta.url).pathname,
     server: { middlewareMode: true, hmr: false, ws: false }, appType: 'custom',
@@ -1317,7 +1316,7 @@ test('the practice exits keep the CV while the plan removal control drops it', a
   assert.equal(persistSession(storage), true);
 
   // End practice and start over, and Practise a different job.
-  startOver({ keepResume: true, storage });
+  startOver({ storage });
   assert.equal(session.phase, 'idle');
   assert.equal(session.resume, cv);
   assert.equal(session.resumeName, 'jane-cv.pdf');
@@ -1340,8 +1339,8 @@ test('the practice exits keep the CV while the plan removal control drops it', a
   const pasted = render(Start.default);
   assert.ok(pasted.body.includes(cv));
 
-  // Remove my CV and start over keeps its meaning.
-  startOver({ storage });
+  // Explicit keepResume: false removes the CV.
+  startOver({ keepResume: false, storage });
   assert.equal(session.resume, null);
   assert.equal(session.resumeName, null);
 });
