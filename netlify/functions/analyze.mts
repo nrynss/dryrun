@@ -207,7 +207,9 @@ async function runModel(body: BriefBody | ScoreBody, clientFactory: ClientFactor
         // Brief is the quality-critical call: it has to find the tension in a
         // posting, not just paraphrase it. Score is a short rubric judgement
         // on one answer, so it stays at the provider default for speed.
-        ...(isBrief ? { reasoning: { effort: 'medium' as const } } : {}),
+        // reasoning.effort is set to 'low' so brief calls complete in ~8-12s
+        // and stay safely beneath the 26s model timeout.
+        ...(isBrief ? { reasoning: { effort: 'low' as const } } : {}),
         instructions: isBrief ? BRIEF_INSTRUCTIONS : SCORE_INSTRUCTIONS,
         input: JSON.stringify(isBrief
           ? { posting: body.posting, resume: body.resume ?? null }
