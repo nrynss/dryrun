@@ -40,7 +40,7 @@ type BriefContext = { owns: string[]; study: string[]; angles: string[]; confide
 // part of that stable browser/session contract, even though it is not scoring
 // context and is intentionally excluded from the provider prompt below.
 type QuestionContext = { id: `q${number}`; prompt: string; sourceQuote: string; targetsGap: boolean };
-type BriefBody = { task: 'brief'; posting: string; resume?: string };
+type BriefBody = { task: 'brief'; posting: string; resume?: string; model?: string };
 type ScoreBody = { task: 'score'; answer: string; question: QuestionContext; brief: BriefContext };
 type ModelClient = { responses: { create: (request: Record<string, unknown>, options?: Record<string, unknown>) => Promise<any> } };
 type ClientFactory = () => ModelClient;
@@ -155,11 +155,12 @@ function parseQuestionContext(value: unknown): QuestionContext | null {
 function validateBody(value: unknown): { body?: BriefBody | ScoreBody; error?: string; status?: number } {
   if (!isRecord(value) || !isNonBlankString(value.task)) return { error: 'Expected an object with a valid task.', status: 400 };
   if (value.task === 'brief') {
-    if (!hasOnlyKeys(value, ['task', 'posting', 'resume']) || !isNonBlankString(value.posting) || (value.resume !== undefined && !isNonBlankString(value.resume))) return { error: 'Brief requests need a posting string and an optional non-empty resume string.', status: 400 };
+    if (!hasOnlyKeys(value, ['task', 'posting', 'resume', 'model']) || !isNonBlankString(value.posting) || (value.resume !== undefined && !isNonBlankString(value.resume)) || (value.model !== undefined && value.model !== 'gpt-5.6-luna' && value.model !== 'gpt-5.6-terra')) return { error: 'Brief requests need a posting string and an optional non-empty resume string.', status: 400 };
     if (value.posting.length > MAX_POSTING_CHARS) return { error: `Posting exceeds the ${MAX_POSTING_CHARS.toLocaleString()} character limit.`, status: 413 };
     if (typeof value.resume === 'string' && value.resume.length > MAX_RESUME_CHARS) return { error: `Resume exceeds the ${MAX_RESUME_CHARS.toLocaleString()} character limit.`, status: 413 };
     const resume = isNonBlankString(value.resume) ? value.resume.trim() : undefined;
-    return { body: { task: 'brief', posting: value.posting.trim(), ...(resume ? { resume } : {}) } };
+    const model = isNonBlankString(value.model) ? value.model.trim() : undefined;
+    return { body: { task: 'brief', posting: value.posting.trim(), ...(resume ? { resume } : {}), ...(model ? { model } : {}) } };
   }
   if (value.task === 'score') {
     const question = parseQuestionContext(value.question);
@@ -175,12 +176,12 @@ function isRetryableUpstream(error: any) {
   const status = error?.status;
   return error instanceof APIConnectionError || status === 408 || status === 409 || status === 429 || (typeof status === 'number' && status >= 500);
 }
-function publicUsage(response: any, attempts: number) {
+function publicUsage(response: any, attempts: number, fallbackModel: string = MODEL) {
   const usage = response.usage ?? {};
   // These fields are sufficient for a durable T12 price reconciliation without
   // exposing provider headers, IDs, or error details to a browser caller.
   return {
-    model: response.model ?? MODEL, attempts,
+    model: response.model ?? fallbackModel, attempts,
     inputTokens: usage.input_tokens ?? null, outputTokens: usage.output_tokens ?? null, totalTokens: usage.total_tokens ?? null,
     inputTokensDetails: { cachedTokens: usage.input_tokens_details?.cached_tokens ?? null, cacheWriteTokens: usage.input_tokens_details?.cache_write_tokens ?? null },
     outputTokensDetails: { reasoningTokens: usage.output_tokens_details?.reasoning_tokens ?? null },
@@ -192,6 +193,7 @@ const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
 async function runModel(body: BriefBody | ScoreBody, clientFactory: ClientFactory, retryBackoffMs: number) {
   const client = clientFactory();
   const isBrief = body.task === 'brief';
+  const selectedModel = ('model' in body && body.model) ? body.model : MODEL;
   const startedAt = Date.now();
   const floor = isBrief ? MIN_ATTEMPT_MS.brief : MIN_ATTEMPT_MS.score;
   let lastError: unknown;
@@ -203,7 +205,7 @@ async function runModel(body: BriefBody | ScoreBody, clientFactory: ClientFactor
     const timeout = Math.max(1_000, Math.min(MODEL_TIMEOUT_MS, remaining));
     try {
       const response = await client.responses.create({
-        model: MODEL, max_output_tokens: isBrief ? BRIEF_MAX_OUTPUT_TOKENS : SCORE_MAX_OUTPUT_TOKENS,
+        model: selectedModel, max_output_tokens: isBrief ? BRIEF_MAX_OUTPUT_TOKENS : SCORE_MAX_OUTPUT_TOKENS,
         // Brief is the quality-critical call: it has to find the tension in a
         // posting, not just paraphrase it. Score is a short rubric judgement
         // on one answer, so it stays at the provider default for speed.
@@ -227,7 +229,7 @@ async function runModel(body: BriefBody | ScoreBody, clientFactory: ClientFactor
       try { data = JSON.parse(response.output_text); } catch { throw new MalformedModelOutput('invalid_json'); }
       const problems = isBrief ? validateBriefResponse(data, { posting: body.posting, requireFitMatch: Boolean(body.resume) }) : validateScoreResponse(data);
       if (problems.length) throw new MalformedModelOutput('semantic_validation', problems[0]);
-      return { data, usage: publicUsage(response, attempt) };
+      return { data, usage: publicUsage(response, attempt, selectedModel) };
     } catch (error) {
       if (error instanceof ModelRefusal) throw error;
       lastError = error;
